@@ -40,7 +40,7 @@ export function Layout() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
               <Shield className="h-8 w-8 text-cyan-500" />
-              <span className="ml-2 text-xl font-bold">CyberGuard Analyzer</span>
+              <span className="ml-2 text-xl font-bold">CyberVel Analyzer</span>
             </div>
           </div>
         </div>

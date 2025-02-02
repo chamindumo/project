@@ -20,7 +20,9 @@ export function FileHistory({
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center">
           <Calendar className="h-5 w-5 text-cyan-500 mr-2" />
-          <h2 className="text-xl font-semibold">Analysis History</h2>
+          <h2 className="text-xl font-semibold truncate max-w-full">
+            History
+          </h2>
         </div>
         {history.length > 0 && (
           <button
@@ -40,7 +42,7 @@ export function FileHistory({
           {history.map((item) => (
             <div
               key={item.id}
-              className="bg-gray-700 rounded-lg overflow-hidden"
+              className="bg-gray-700 rounded-lg overflow-hidden shadow-md border border-gray-600"
             >
               <div className="p-4 flex items-center justify-between hover:bg-gray-600 transition-colors">
                 <div 
@@ -48,7 +50,7 @@ export function FileHistory({
                   onClick={() => onSelectFile(item)}
                 >
                   <FileText className="h-5 w-5 text-cyan-500 mr-3 flex-shrink-0" />
-                  <div className="min-w-0">
+                  <div className="min-w-0 max-w-[calc(100%-4rem)] truncate">
                     <p className="font-medium truncate">{item.fileName}</p>
                     <div className="flex items-center text-sm text-gray-400 space-x-2">
                       <span>{(item.fileSize / 1024).toFixed(2)} KB</span>
@@ -67,7 +69,7 @@ export function FileHistory({
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              <div className="px-4 py-2 bg-gray-750 border-t border-gray-600">
+              <div className="px-4 py-2 bg-gray-750 border-t border-gray-600 flex items-center">
                 <span
                   className={`text-sm ${
                     item.status === 'analyzed' ? 'text-green-400' : 'text-yellow-400'
