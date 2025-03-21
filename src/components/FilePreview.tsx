@@ -24,11 +24,13 @@ export function FilePreview({ file, preview }: FilePreviewProps) {
 
       <div className="bg-gray-800 rounded-lg p-6">
         <h2 className="text-xl font-semibold mb-4">Preview</h2>
-        <img 
-          src={preview} 
-          alt="File preview" 
-          className="max-w-full h-auto rounded"
-        />
+        <div className="flex justify-center">
+          <img 
+            src={preview} 
+            alt="File preview" 
+            className="max-w-[300px] max-h-[300px] w-auto h-auto rounded object-contain"
+          />
+        </div>
       </div>
     </div>
   );
