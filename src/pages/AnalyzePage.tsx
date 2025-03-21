@@ -4,34 +4,39 @@ import { FilePreview } from '../components/FilePreview';
 import { PageHeader } from '../components/PageHeader';
 import { useFileHistory, HistoryItem } from '../hooks/useFileHistory';
 import { useOutletContext } from 'react-router-dom';
-import { HfInference } from "@huggingface/inference";
+import { PDFPreview } from '../components/PDFPreview';
+
 
 export function AnalyzePage() {
   const { addToHistory, updateHistoryItem } = useFileHistory();
   const [loading, setLoading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [analysis, setAnalysis] = useState<any | null>(null); // Store classification results
+  const [analysis, setAnalysis] = useState<any | null>(null); 
   const [currentFileId, setCurrentFileId] = useState<string | null>(null);
   const [recommendations, setRecommendations] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Get the ref setter from the outlet context
   const { ref } = useOutletContext<{ ref: (instance: any) => void }>();
 
-  // Handle file drop
   const handleFileDrop = useCallback((droppedFile: File) => {
+    setError(null);
+    if (droppedFile.type !== 'image/jpeg') {
+      setError('Only JPEG files are allowed. Please upload a valid .jpeg file.');
+      setFile(null);
+      setPreview(null);
+      setAnalysis(null);
+      setCurrentFileId(null);
+      return;
+    }
+    
     setFile(droppedFile);
-
-    // Create file preview
     const reader = new FileReader();
     reader.onload = (e) => {
       const preview = e.target?.result as string;
       setPreview(preview);
-
       const newFileId = crypto.randomUUID();
       setCurrentFileId(newFileId);
-
-      // Add to history with preview
       addToHistory({
         id: newFileId,
         fileName: droppedFile.name,
@@ -43,7 +48,6 @@ export function AnalyzePage() {
     };
     reader.readAsDataURL(droppedFile);
   }, [addToHistory]);
-
 
   const fetchChatCompletion = async (analysisResults:string, iqa:string) => {
     try {
@@ -65,7 +69,7 @@ export function AnalyzePage() {
       });
   
       const chatCompletion = await response.json();
-      console.log('API Response:', chatCompletion); // Log the entire response
+      console.log('API Response:', chatCompletion); 
   
       if (!chatCompletion.choices || chatCompletion.choices.length === 0) {
         throw new Error('No choices returned from the API');
@@ -74,22 +78,45 @@ export function AnalyzePage() {
       return chatCompletion.choices[0].message.content;
     } catch (error) {
       console.error('Error fetching chat completion:', error);
-      throw error; // Re-throw the error to handle it in the calling function
+      throw error; 
     }
   };
   
+  const handleHistoryItemSelect = useCallback((item: HistoryItem) => {
+    setCurrentFileId(item.id);
+    setPreview(item.preview || null);
+    setAnalysis(item.analysis || null);
+    
+    if (item.preview) {
+      const byteString = atob(item.preview.split(',')[1]);
+      const mimeString = item.preview.split(',')[0].split(':')[1].split(';')[0];
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      const newFile = new File([ab], item.fileName, { type: mimeString });
+      setFile(newFile);
+    }
+  }, []);
 
-  // Handle image classification via Flask backend
+  const handlers = useRef({ handleHistoryItemSelect });
+  React.useEffect(() => {
+    if (ref) {
+      ref(handlers.current);
+    }
+  }, [ref]);
+
+  
   const handleAnalyze = useCallback(async () => {
     if (!file || !currentFileId || !preview) return;
-    setLoading(true); // Set loading to true when analysis starts
+    setLoading(true); 
 
     try {
-      // Prepare the form data to send the image to the Flask backend
       const formData = new FormData();
       formData.append('image', file);
 
-      // Send the image to the Flask backend for classification
+      
       const response = await fetch('http://127.0.0.1:5000/predict', {
         method: 'POST',
         body: formData,
@@ -99,13 +126,11 @@ export function AnalyzePage() {
         throw new Error(`Error: ${response.status} - ${response.statusText}`);
       }
 
-      // Parse the JSON response from the Flask backend
       const result = await response.json();
 
-      // Update the analysis state with the classification results
       setAnalysis(result);
 
-      // Fetch recommendations from chat completion
+      
       const fileDetails = `
 - File Name: ${file.name}
 - File Size: ${(file.size / 1024).toFixed(2)} KB
@@ -119,21 +144,19 @@ export function AnalyzePage() {
       const recommendations = await fetchChatCompletion(analysisResults, iqa);
       setRecommendations(recommendations ?? null);
 
-      // Update history item with both preview and analysis
       updateHistoryItem(currentFileId, {
         status: 'analyzed',
-        analysis: result, // Store the classification results in history
+        analysis: result, 
         preview,
       });
     } catch (error) {
       console.error('Error during analysis:', error);
       setAnalysis({ error: 'Failed to analyze the file. Please try again.' });
     }finally {
-      setLoading(false); // Set loading to false when analysis completes
+      setLoading(false); 
     }
   }, [file, currentFileId, preview, updateHistoryItem]);
 
-  // Generate a proper report
   const renderReport = () => {
     if (!file || !analysis || !recommendations) return null;
 
@@ -160,7 +183,6 @@ Recommendations:
 ${recommendations}
       `;
 
-      // Create a Blob and trigger download
       const blob = new Blob([reportContent || ''], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

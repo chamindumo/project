@@ -24,7 +24,7 @@ export function FileHistory({
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center">
           <Calendar className="h-5 w-5 text-cyan-500 mr-2" />
-          <h2 className="text-xl font-semibold">History</h2>
+          <h2 className="text-xl font-semibold">Analysis History</h2>
         </div>
         {history.length > 0 && (
           <button
