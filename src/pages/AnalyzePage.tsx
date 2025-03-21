@@ -21,7 +21,7 @@ export function AnalyzePage() {
 
   const handleFileDrop = useCallback((droppedFile: File) => {
     setError(null);
-    if (droppedFile.type !== 'image/jpeg') {
+    if (droppedFile.type !== 'image/jpg') {
       setError('Only JPEG files are allowed. Please upload a valid .jpeg file.');
       setFile(null);
       setPreview(null);
