@@ -6,7 +6,6 @@ import { useFileHistory, HistoryItem } from '../hooks/useFileHistory';
 import { useOutletContext } from 'react-router-dom';
 import { PDFPreview } from '../components/PDFPreview';
 
-
 export function AnalyzePage() {
   const { addToHistory, updateHistoryItem } = useFileHistory();
   const [loading, setLoading] = useState(false);
@@ -21,8 +20,13 @@ export function AnalyzePage() {
 
   const handleFileDrop = useCallback((droppedFile: File) => {
     setError(null);
-    if (droppedFile.type !== 'image/jpg') {
-      setError('Only JPG files are allowed. Please upload a valid .jpg file.');
+    
+    // Check both MIME type and file extension
+    const isJpgMimeType = droppedFile.type === 'image/jpeg';
+    const hasJpgExtension = droppedFile.name.toLowerCase().endsWith('.jpg');
+    
+    if (!isJpgMimeType || !hasJpgExtension) {
+      setError('Only .jpg files are allowed. Please upload a valid .jpg file.');
       setFile(null);
       setPreview(null);
       setAnalysis(null);
@@ -107,7 +111,6 @@ export function AnalyzePage() {
     }
   }, [ref]);
 
-  
   const handleAnalyze = useCallback(async () => {
     if (!file || !currentFileId || !preview) return;
     setLoading(true); 
@@ -115,7 +118,6 @@ export function AnalyzePage() {
     try {
       const formData = new FormData();
       formData.append('image', file);
-
       
       const response = await fetch('http://127.0.0.1:5000/predict', {
         method: 'POST',
@@ -127,19 +129,10 @@ export function AnalyzePage() {
       }
 
       const result = await response.json();
-
       setAnalysis(result);
-
       
-      const fileDetails = `
-- File Name: ${file.name}
-- File Size: ${(file.size / 1024).toFixed(2)} KB
-- Last Modified: ${new Date(file.lastModified).toLocaleDateString()}
-      `;
-
-      const analysisResults = result.payload_class
-      const iqa = result.iqa_score.toFixed(2)
-;
+      const analysisResults = result.payload_class;
+      const iqa = result.iqa_score.toFixed(2);
 
       const recommendations = await fetchChatCompletion(analysisResults, iqa);
       setRecommendations(recommendations ?? null);
@@ -152,7 +145,7 @@ export function AnalyzePage() {
     } catch (error) {
       console.error('Error during analysis:', error);
       setAnalysis({ error: 'Failed to analyze the file. Please try again.' });
-    }finally {
+    } finally {
       setLoading(false); 
     }
   }, [file, currentFileId, preview, updateHistoryItem]);
@@ -257,7 +250,7 @@ ${recommendations}
 
   return (
     <div>
-       <style>
+      <style>
         {`
           @keyframes loading {
             from {
@@ -269,43 +262,41 @@ ${recommendations}
           }
         `}
       </style>
-    {loading ? (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100px' }}>
-        <p>Image is processing...</p>
-        <div style={{
-          width: '100%',
-          height: '15px',
-          background: 'linear-gradient(to right, #4caf50 0%, #4caf50 50%, #ccc 50%, #ccc 100%)',
-          backgroundSize: '200% 100%',
-          animation: 'loading 1.5s infinite'
-        }}></div>
-      </div>
+      {loading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100px' }}>
+          <p>Image is processing...</p>
+          <div style={{
+            width: '100%',
+            height: '15px',
+            background: 'linear-gradient(to right, #4caf50 0%, #4caf50 50%, #ccc 50%, #ccc 100%)',
+            backgroundSize: '200% 100%',
+            animation: 'loading 1.5s infinite'
+          }}></div>
+        </div>
       ) : (
-    <div>
-      <PageHeader title="File Analysis" />
+        <div>
+          <PageHeader title="File Analysis" />
 
-      {!file && <FileDropZone onFileDrop={handleFileDrop} />}
+          {!file && <FileDropZone onFileDrop={handleFileDrop} />}
 
-      {file && preview && (
-        <div className="space-y-8">
-          <FilePreview file={file} preview={preview} />
+          {file && preview && (
+            <div className="space-y-8">
+              <FilePreview file={file} preview={preview} />
 
-          {!analysis && (
-            <button
-              onClick={handleAnalyze}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
-            >
-              Analyze File
-            </button>
+              {!analysis && (
+                <button
+                  onClick={handleAnalyze}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                >
+                  Analyze File
+                </button>
+              )}
+
+              {analysis && renderReport()}
+            </div>
           )}
-
-          {analysis && renderReport()}
         </div>
       )}
-      
     </div>
-    )}
-    </div>
-    
   );
 }

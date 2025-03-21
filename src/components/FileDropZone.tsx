@@ -13,7 +13,7 @@ export function FileDropZone({ onFileDrop }: FileDropZoneProps) {
     setError(null);
     
     // Check both MIME type and file extension
-    const isJpgMimeType = file.type === 'image/jpg';
+    const isJpgMimeType = file.type === 'image/jpeg';
     const hasJpgExtension = file.name.toLowerCase().endsWith('.jpg');
     
     if (!isJpgMimeType || !hasJpgExtension) {
