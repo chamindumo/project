@@ -13,11 +13,11 @@ export function FileDropZone({ onFileDrop }: FileDropZoneProps) {
     setError(null);
     
     // Check both MIME type and file extension
-    const isJpegMimeType = file.type === 'image/jpeg';
-    const hasJpegExtension = file.name.toLowerCase().endsWith('.jpeg');
+    const isJpgMimeType = file.type === 'image/jpg';
+    const hasJpgExtension = file.name.toLowerCase().endsWith('.jpg');
     
-    if (!isJpegMimeType || !hasJpegExtension) {
-      setError('Only .jpeg files are allowed. Please upload a valid .jpeg file.');
+    if (!isJpgMimeType || !hasJpgExtension) {
+      setError('Only .jpg files are allowed. Please upload a valid .jpg file.');
       return;
     }
     
@@ -57,11 +57,11 @@ export function FileDropZone({ onFileDrop }: FileDropZoneProps) {
         className="border-2 border-dashed border-cyan-500 rounded-lg p-12 text-center cursor-pointer hover:bg-gray-800 transition-colors"
       >
         <Upload className="mx-auto h-12 w-12 text-cyan-500 mb-4" />
-        <p className="text-lg mb-2">Drop your JPEG file here</p>
-        <p className="text-sm text-gray-400 mb-4">(.jpeg files only)</p>
+        <p className="text-lg mb-2">Drop your JPG file here</p>
+        <p className="text-sm text-gray-400 mb-4">(.jpg files only)</p>
         <input
           type="file"
-          accept=".jpeg"
+          accept=".jpg"
           className="hidden"
           ref={fileInputRef}
           onChange={handleFileChange}
@@ -70,7 +70,7 @@ export function FileDropZone({ onFileDrop }: FileDropZoneProps) {
           onClick={() => fileInputRef.current?.click()}
           className="bg-cyan-500 hover:bg-cyan-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
         >
-          Select JPEG File
+          Select JPG File
         </button>
       </div>
     </div>
