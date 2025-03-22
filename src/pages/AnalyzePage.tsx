@@ -6,6 +6,11 @@ import { useFileHistory, HistoryItem } from '../hooks/useFileHistory';
 import { useOutletContext } from 'react-router-dom';
 import { PDFPreview } from '../components/PDFPreview';
 import jsPDF from 'jspdf';
+import { Doughnut, Pie } from 'react-chartjs-2'; // Import Doughnut and Pie charts
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'; // Import Chart.js components
+
+// Register Chart.js components
+ChartJS.register(ArcElement, Tooltip, Legend);
 
 export function AnalyzePage() {
   const { addToHistory, updateHistoryItem, saveReportToDatabase, fetchReportFromDatabase } = useFileHistory();
@@ -279,16 +284,17 @@ Use formal language and ensure the report is easy to understand for both technic
             <h4 className="text-xl font-semibold text-blue-400">{`${sectionCount}. ${trimmedLine.slice(2).trim()}`}</h4>
           </div>
         );
-      } else if (trimmedLine.startsWith('-')) {
+      } else if (trimmedLine.startsWith('-') || trimmedLine.startsWith('*')) {
+        const content = trimmedLine.startsWith('-') ? trimmedLine.slice(1).trim() : trimmedLine.slice(1).trim();
         return (
-          <li key={i} className="ml-6 text-gray-300 list-disc">
-            <strong>{trimmedLine.slice(1).trim()}</strong>
-          </li>
-        );
-      } else if (trimmedLine.startsWith('* **')) {
-        return (
-          <li key={i} className="ml-6 text-gray-300 list-disc">
-            <strong>Point:</strong> {trimmedLine.slice(4).trim()}
+          <li key={i} className="ml-6 text-gray-300 list-decimal">
+            {trimmedLine.startsWith('* **') ? (
+              <span>
+                <strong>Point:</strong> {trimmedLine.slice(4).trim()}
+              </span>
+            ) : (
+              <strong>{content}</strong>
+            )}
           </li>
         );
       } else if (trimmedLine.includes('**')) {
@@ -323,7 +329,7 @@ Use formal language and ensure the report is easy to understand for both technic
 
     const analysisResults = {
       payloadClass: analysis.payload_class,
-      iqaScore: analysis.iqa_score.toFixed(2),
+      iqaScore: parseFloat(analysis.iqa_score).toFixed(2),
       classProbabilities: analysis.class_probabilities,
     };
 
@@ -332,6 +338,82 @@ Use formal language and ensure the report is easy to understand for both technic
       { src: analysis.srm_filtered, caption: "SRM Filtered" },
       { src: analysis.noise_residual, caption: "Noise Residual" },
     ];
+
+    // Prepare data for the Class Probabilities circular progress charts
+    const classChartOptions = {
+      responsive: true,
+      cutout: '80%', // Makes the doughnut chart a thin ring
+      plugins: {
+        legend: {
+          display: false, // Hide the legend
+        },
+        tooltip: {
+          enabled: false, // Disable tooltips
+        },
+        // Custom plugin to display percentage in the center
+        centerText: {
+          id: 'centerText',
+          afterDatasetsDraw(chart: any) {
+            const { ctx, chartArea: { width, height } } = chart;
+            ctx.save();
+            ctx.font = 'bold 24px Helvetica';
+            ctx.fillStyle = '#D1D5DB'; // Tailwind gray-300
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const text = chart.data.datasets[0].data[0] + '%';
+            ctx.fillText(text, width / 2, height / 2);
+            ctx.restore();
+          },
+        },
+      },
+      rotation: -90, // Start the progress from the top
+      circumference: 360, // Full circle
+    };
+
+    const classProbabilitiesCharts = Object.entries(analysisResults.classProbabilities).map(([className, prob]) => {
+      const percentage = ((prob as number) * 100).toFixed(2);
+      const chartData = {
+        labels: [className],
+        datasets: [
+          {
+            data: [percentage, 100 - parseFloat(percentage)], // Progress and remaining
+            backgroundColor: ['#FF0000', '#E5E7EB'], // Red for progress, gray for background
+            borderWidth: 0,
+            borderColor: '#FFFFFF', // White gap
+            borderAlign: 'inner' as const,
+          },
+        ],
+      };
+      return { className, percentage, chartData };
+    });
+
+    // Prepare data for the IQA pie chart
+    const iqaPercentage = (parseFloat(analysisResults.iqaScore) * 100).toFixed(2);
+    const iqaChartData = {
+      labels: ['IQA', 'Remaining'],
+      datasets: [
+        {
+          label: 'Image Quality Assessment',
+          data: [iqaPercentage, 100 - parseFloat(iqaPercentage)],
+          backgroundColor: ['#36A2EB', '#E5E7EB'], // Blue for IQA, gray for remaining
+          hoverBackgroundColor: ['#36A2EB', '#E5E7EB'],
+        },
+      ],
+    };
+
+    const iqaChartOptions = {
+      responsive: true,
+      plugins: {
+        legend: {
+          display: false, // Hide the legend
+        },
+        tooltip: {
+          callbacks: {
+            label: (context: any) => `${context.label}: ${context.raw}%`,
+          },
+        },
+      },
+    };
 
     const downloadReport = () => {
       const doc = new jsPDF();
@@ -342,8 +424,10 @@ Use formal language and ensure the report is easy to understand for both technic
       let yPosition = margin;
 
       const headerColor = '#1E3A8A';
-      const sectionHeaderColor = '#2563EB';
+      const sectionHeaderColor = '#2563EB'; // Heading 1 color
+      const subHeaderColor = '#4B5EAA'; // Heading 2 color
       const textColor = '#000000';
+      const lineSpacing = 1.5; // Set line spacing to 1.5
 
       const addText = (text: string, x: number, y: number, fontSize: number, isBold: boolean = false, color: string = textColor) => {
         doc.setFontSize(fontSize);
@@ -351,28 +435,108 @@ Use formal language and ensure the report is easy to understand for both technic
         doc.setTextColor(color);
         const lines = doc.splitTextToSize(text, maxLineWidth);
         doc.text(lines, x, y);
-        return y + (lines.length * fontSize * 0.4);
+        return y + (lines.length * fontSize * 0.4 * lineSpacing);
       };
 
       const addSectionHeading = (heading: string) => {
+        checkPageOverflow(20);
         yPosition = addText(heading, margin, yPosition, 14, true, headerColor);
         yPosition += 3;
       };
 
       const addMainSectionHeading = (heading: string) => {
-        yPosition = addText(heading, margin, yPosition, 16, true, sectionHeaderColor);
+        checkPageOverflow(20);
+        yPosition = addText(heading, margin, yPosition, 16, true, sectionHeaderColor); // Heading 1, bold
         yPosition += 4;
       };
 
-      const addParagraph = (text: string) => {
-        yPosition = addText(text, margin, yPosition, 12, false);
-        yPosition += 4;
+      const addSubHeading = (heading: string, indent: number = 0) => {
+        checkPageOverflow(15);
+        yPosition = addText(heading, margin + indent, yPosition, 14, true, subHeaderColor); // Heading 2, bold
+        yPosition += 2;
       };
 
-      const addBulletPoint = (text: string) => {
-        const bulletText = `• ${text}`;
-        yPosition = addText(bulletText, margin + 5, yPosition, 12);
-        yPosition += 3;
+      const addFormattedText = (text: string, x: number, indent: number = 0) => {
+        const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/);
+        let currentX = x + indent;
+        let currentLine = '';
+        const fontSize = 12;
+        doc.setFontSize(fontSize);
+
+        parts.forEach((part, index) => {
+          const isBoldDouble = part.startsWith('**') && part.endsWith('**');
+          const isBoldSingle = part.startsWith('*') && part.endsWith('*') && !isBoldDouble;
+          const isBold = isBoldDouble || isBoldSingle;
+          const content = isBold ? part.slice(isBoldDouble ? 2 : 1, isBoldDouble ? -2 : -1) : part;
+
+          doc.setFont("helvetica", isBold ? "bold" : "normal");
+          const contentWidth = doc.getTextWidth(content);
+
+          const testLine = currentLine + content;
+          const testLineWidth = doc.getTextWidth(testLine);
+
+          if (currentX === x + indent && testLineWidth <= maxLineWidth) {
+            currentLine += content;
+          } else if (currentX === x + indent && testLineWidth > maxLineWidth) {
+            const words = content.split(' ');
+            words.forEach((word, wordIndex) => {
+              const testWordLine = currentLine + (currentLine ? ' ' : '') + word;
+              const testWordLineWidth = doc.getTextWidth(testWordLine);
+
+              if (testWordLineWidth <= maxLineWidth) {
+                currentLine += (currentLine ? ' ' : '') + word;
+              } else {
+                if (currentLine) {
+                  doc.setFont("helvetica", isBold && wordIndex === 0 ? "bold" : "normal");
+                  checkPageOverflow(5);
+                  doc.text(currentLine, currentX, yPosition);
+                  yPosition += fontSize * 0.4 * lineSpacing;
+                  currentLine = word;
+                } else {
+                  checkPageOverflow(5);
+                  doc.text(word, currentX, yPosition);
+                  yPosition += fontSize * 0.4 * lineSpacing;
+                  currentLine = '';
+                }
+              }
+            });
+          } else {
+            checkPageOverflow(5);
+            doc.text(currentLine, x + indent, yPosition);
+            yPosition += fontSize * 0.4 * lineSpacing;
+            currentLine = content;
+            currentX = x + indent;
+          }
+        });
+
+        if (currentLine) {
+          checkPageOverflow(5);
+          doc.text(currentLine, currentX, yPosition);
+          yPosition += fontSize * 0.4 * lineSpacing;
+        }
+      };
+
+      const addParagraph = (text: string, indent: number = 0) => {
+        addFormattedText(text, margin, indent);
+      };
+
+      const addNumberedPoint = (text: string, pointNumber: number, indentLevel: number = 1) => {
+        const indent = indentLevel * 5;
+        checkPageOverflow(5);
+        doc.setFontSize(12);
+        doc.setTextColor(textColor);
+        const numberText = `${pointNumber}.`;
+        doc.text(numberText, margin + indent - 10, yPosition);
+        addFormattedText(text, margin, indent);
+      };
+
+      const addBulletPoint = (text: string, indentLevel: number = 1) => {
+        const indent = indentLevel * 5;
+        checkPageOverflow(5);
+        doc.setFontSize(12);
+        doc.setTextColor(textColor);
+        doc.text('•', margin + indent - 5, yPosition);
+        addFormattedText(text, margin, indent);
       };
 
       const checkPageOverflow = (additionalHeight: number) => {
@@ -402,6 +566,7 @@ Use formal language and ensure the report is easy to understand for both technic
         }
       };
 
+      // Cover Page
       doc.setFontSize(24);
       doc.setTextColor(headerColor);
       doc.setFont("helvetica", "bold");
@@ -417,21 +582,25 @@ Use formal language and ensure the report is easy to understand for both technic
 
       yPosition = margin + 15;
 
+      // 1. File Details
       addSectionHeading("1. File Details");
       addParagraph(`File Name: ${fileDetails.fileName}`);
       addParagraph(`File Size: ${fileDetails.fileSize}`);
       addParagraph(`Last Modified: ${fileDetails.lastModified}`);
       yPosition += 5;
 
+      // 2. Analysis Results
       addSectionHeading("2. Analysis Results");
       addParagraph(`Payload Classification: ${analysisResults.payloadClass}`);
-      addParagraph("Class Probabilities:");
+      addSubHeading("Class Probabilities:", 5); // Heading 2 style
+      let pointNumber = 1;
       Object.entries(analysisResults.classProbabilities).forEach(([className, prob]) => {
-        addParagraph(`  ${className}: ${((prob as number) * 100).toFixed(2)}%`);
+        addNumberedPoint(`${className}: ${((prob as number) * 100).toFixed(2)}%`, pointNumber++, 2);
       });
       addParagraph(`IQA Score: ${analysisResults.iqaScore}`);
       yPosition += 5;
 
+      // 3. Filtered Images
       addSectionHeading("3. Filtered Images");
       const imgWidth = 60;
       const imgHeight = 60;
@@ -449,9 +618,23 @@ Use formal language and ensure the report is easy to understand for both technic
       });
       yPosition += imgHeight + 15;
 
+      // 4. Original Image
+      if (preview) {
+        addSectionHeading("4. Original Image");
+        const imgWidth = 180;
+        const imgHeight = 100;
+        checkPageOverflow(imgHeight + 20);
+        doc.addImage(preview, 'JPEG', margin, yPosition, imgWidth, imgHeight);
+        yPosition += imgHeight + 10;
+      }
+
+      // 5. Detailed Analysis (Recommendations)
+      let sectionCount = 4; // Start from 5 since we already have 4 sections
       const recommendationLines = recommendations.split('\n').filter(line => line.trim() !== '');
-      let sectionCount = 3;
-      let currentSection = '';
+      let indentLevel = 1;
+      let inPotentialCauses = false;
+      let potentialCausesPointNumber = 1;
+      let sectionPointNumber = 1; // For numbering points in other sections
 
       recommendationLines.forEach((line) => {
         const trimmedLine = line.trim();
@@ -460,47 +643,34 @@ Use formal language and ensure the report is easy to understand for both technic
 
         if (trimmedLine.startsWith('##')) {
           sectionCount++;
-          currentSection = trimmedLine.slice(2).trim();
-
-          let sectionTitle = currentSection;
-          if (sectionCount === 4) sectionTitle = 'Introduction';
-          else if (sectionCount === 5) sectionTitle = `Stegoimage Algorithm Explanation: "${analysisResults.payloadClass}"`;
-          else if (sectionCount === 6) sectionTitle = 'Image Quality Assessment (IQA) and its Interpretation';
-          else if (sectionCount === 7) sectionTitle = 'Recommendations for Improvement';
-          else if (sectionCount === 8) sectionTitle = 'Potential Risks and Vulnerabilities';
-          else if (sectionCount === 9) sectionTitle = 'Conclusion';
-
-          addMainSectionHeading(`${sectionCount - 3}. ${sectionTitle}`);
+          inPotentialCauses = false;
+          indentLevel = 1;
+          potentialCausesPointNumber = 1; // Reset point number for Potential Causes
+          sectionPointNumber = 1; // Reset point number for new section
+          addMainSectionHeading(`${sectionCount}. ${trimmedLine.slice(2).trim()}`); // Heading 1, bold
+        } else if (trimmedLine === 'Potential Causes:') {
+          inPotentialCauses = true;
+          addSubHeading(trimmedLine, 5); // Heading 2 style, bold
+          indentLevel = 2;
         } else if (trimmedLine.startsWith('* **')) {
           const bulletText = trimmedLine.slice(4).trim();
-          addBulletPoint(`Point: ${bulletText}`);
+          if (inPotentialCauses) {
+            addNumberedPoint(`Point: ${bulletText}`, potentialCausesPointNumber++, indentLevel);
+          } else {
+            addNumberedPoint(`Point: ${bulletText}`, sectionPointNumber++, indentLevel);
+          }
         } else if (trimmedLine.startsWith('-')) {
           const bulletText = trimmedLine.slice(1).trim();
-          addBulletPoint(bulletText);
-        } else if (trimmedLine.includes('**')) {
-          const parts = trimmedLine.split(/(\*\*.*?\*\*)/);
-          let formattedLine = '';
-          parts.forEach(part => {
-            if (part.startsWith('**') && part.endsWith('**')) {
-              formattedLine += part.slice(2, -2);
-            } else {
-              formattedLine += part;
-            }
-          });
-          addParagraph(formattedLine);
-        } else if (trimmedLine) {
-          addParagraph(trimmedLine);
+          if (inPotentialCauses) {
+            addNumberedPoint(bulletText, potentialCausesPointNumber++, indentLevel);
+          } else {
+            addNumberedPoint(bulletText, sectionPointNumber++, indentLevel);
+          }
+        } else if (trimmedLine.startsWith('*') && !trimmedLine.startsWith('* **')) {
+          const bulletText = trimmedLine.slice(1).trim();
+          addParagraph(bulletText, indentLevel);
         }
       });
-
-      if (preview) {
-        checkPageOverflow(120);
-        addSectionHeading(`${sectionCount - 2}. Original Image`);
-        const imgWidth = 180;
-        const imgHeight = 100;
-        doc.addImage(preview, 'JPEG', margin, yPosition, imgWidth, imgHeight);
-        yPosition += imgHeight + 10;
-      }
 
       const pageCount = doc.getNumberOfPages();
       for (let i = 2; i <= pageCount; i++) {
@@ -512,47 +682,8 @@ Use formal language and ensure the report is easy to understand for both technic
       doc.save(`${file.name}_analysis_report.pdf`);
     };
 
-    const formattedRecommendations = formatRecommendations(recommendations);
-
-    // Function to calculate pie chart segments
-    const calculatePieSegments = (iqaScore: number) => {
-      const iqaPercentage = iqaScore * 100; // Assuming iqaScore is 0 to 1
-      const remainingPercentage = 100 - iqaPercentage;
-
-      const iqaAngle = (iqaPercentage / 100) * 360; // Convert percentage to degrees
-      const remainingAngle = (remainingPercentage / 100) * 360;
-
-      return [
-        { label: 'IQA Score', percentage: iqaPercentage, angle: iqaAngle, color: '#10B981' }, // Green (Tailwind's emerald-500)
-        { label: 'Remaining', percentage: remainingPercentage, angle: remainingAngle, color: '#6B7280' }, // Gray (Tailwind's gray-500)
-      ];
-    };
-
-    // Function to generate SVG path for a pie chart segment
-    const getPiePath = (startAngle: number, endAngle: number, radius: number, cx: number, cy: number) => {
-      const startRad = (startAngle * Math.PI) / 180;
-      const endRad = (endAngle * Math.PI) / 180;
-
-      const startX = cx + radius * Math.cos(startRad);
-      const startY = cy + radius * Math.sin(startRad);
-      const endX = cx + radius * Math.cos(endRad);
-      const endY = cy + radius * Math.sin(endRad);
-
-      const largeArcFlag = endAngle - startAngle <= 180 ? 0 : 1;
-
-      return [
-        `M ${cx} ${cy}`, // Move to center
-        `L ${startX} ${startY}`, // Line to start
-        `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${endX} ${endY}`, // Arc to end
-        `Z`, // Close path
-      ].join(' ');
-    };
-
-    const iqaSegments = calculatePieSegments(analysis.iqa_score);
-
     return (
       <div className="bg-gray-900 shadow-lg rounded-lg p-8 space-y-6 text-white max-w-4xl mx-auto">
-        {/* File Details */}
         <div className="border-b border-gray-700 pb-4">
           <h3 className="text-2xl font-bold text-blue-400 mb-3">File Details</h3>
           <ul className="space-y-2 text-gray-300">
@@ -569,7 +700,6 @@ Use formal language and ensure the report is easy to understand for both technic
           </ul>
         </div>
 
-        {/* Analysis Results */}
         <div className="border-b border-gray-700 pb-4">
           <h3 className="text-2xl font-bold text-blue-400 mb-3">Analysis Results</h3>
           {analysis.error ? (
@@ -582,99 +712,27 @@ Use formal language and ensure the report is easy to understand for both technic
               </div>
               <div>
                 <span className="font-semibold text-blue-200">Class Probabilities:</span>
-                <div className="flex justify-start gap-8 mt-2 flex-wrap">
-                  {Object.entries(analysis.class_probabilities).map(([className, prob]) => {
-                    const percentage = (prob as number) * 100;
-                    const circumference = 2 * Math.PI * 45;
-                    const strokeDashoffset = circumference - (percentage / 100) * circumference;
-
-                    return (
-                      <div key={className} className="text-center">
-                        <div className="relative w-32 h-32">
-                          <svg className="w-full h-full" viewBox="0 0 100 100">
-                            <circle
-                              className="text-gray-700"
-                              strokeWidth="10"
-                              stroke="currentColor"
-                              fill="transparent"
-                              r="45"
-                              cx="50"
-                              cy="50"
-                            />
-                            <circle
-                              className="text-red-500"
-                              strokeWidth="10"
-                              strokeDasharray={circumference}
-                              strokeDashoffset={strokeDashoffset}
-                              strokeLinecap="round"
-                              stroke="currentColor"
-                              fill="transparent"
-                              r="45"
-                              cx="50"
-                              cy="50"
-                              transform="rotate(-90 50 50)"
-                            />
-                            <text
-                              x="50"
-                              y="50"
-                              textAnchor="middle"
-                              dy=".3em"
-                              className="text-xl font-semibold fill-current text-white"
-                            >
-                              {percentage.toFixed(2)}%
-                            </text>
-                          </svg>
-                        </div>
-                        <p className="mt-2 text-gray-300 text-sm">{className}</p>
+                <div className="mt-4 flex flex-wrap justify-center gap-8">
+                  {classProbabilitiesCharts.map((chart, index) => (
+                    <div key={index} className="text-center">
+                      <div className="relative w-32 h-32">
+                        <Doughnut
+                          data={chart.chartData}
+                          options={classChartOptions}
+                          plugins={[classChartOptions.plugins.centerText]}
+                        />
                       </div>
-                    );
-                  })}
+                      <p className="mt-2 text-gray-300 text-sm">{chart.className}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
               <div>
                 <span className="font-semibold text-blue-200">Image Quality Assessment (IQA):</span>{' '}
-                <span className="text-green-400">{analysis.iqa_score.toFixed(2)}</span>
-                <div className="flex items-center gap-6 mt-4">
-                  <div className="relative w-40 h-40">
-                    <svg className="w-full h-full" viewBox="0 0 200 200">
-                      {iqaSegments.map((segment, index) => {
-                        const startAngle = iqaSegments.slice(0, index).reduce((sum, seg) => sum + seg.angle, 0);
-                        const endAngle = startAngle + segment.angle;
-                        const path = getPiePath(startAngle, endAngle, 100, 100, 100);
-                        return (
-                          <React.Fragment key={`${segment.label}-${index}`}>
-                            <path
-                              d={path}
-                              fill={segment.color}
-                              stroke="#1F2937" // Tailwind gray-800 for borders
-                              strokeWidth="2"
-                            />
-                            <text
-                              x="100"
-                              y="100"
-                              textAnchor="middle"
-                              dy=".3em"
-                              className="text-lg font-semibold fill-current text-white"
-                            >
-                              {segment.label === 'IQA Score' ? `${segment.percentage.toFixed(2)}%` : ''}
-                            </text>
-                          </React.Fragment>
-                        );
-                      })}
-                    </svg>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    {iqaSegments.map((segment, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <div
-                          className="w-4 h-4 rounded"
-                          style={{ backgroundColor: segment.color }}
-                        ></div>
-                        <span className="text-gray-300">
-                          {segment.label}: {segment.percentage.toFixed(2)}% ({segment.angle.toFixed(0)}°)
-                        </span>
-                      </div>
-                    ))}
+                <span className="text-green-400">{analysisResults.iqaScore}</span>
+                <div className="mt-4 flex justify-center">
+                  <div className="w-64 h-64">
+                    <Pie data={iqaChartData} options={iqaChartOptions} />
                   </div>
                 </div>
               </div>
@@ -682,7 +740,6 @@ Use formal language and ensure the report is easy to understand for both technic
           )}
         </div>
 
-        {/* Filtered Images */}
         <div className="border-b border-gray-700 pb-4">
           <h3 className="text-2xl font-bold text-blue-400 mb-4">Filtered Images</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -695,13 +752,11 @@ Use formal language and ensure the report is easy to understand for both technic
           </div>
         </div>
 
-        {/* Recommendations */}
         <div>
           <h3 className="text-2xl font-bold text-blue-400 mb-4">Detailed Analysis</h3>
-          <div className="text-gray-300 space-y-2">{formattedRecommendations}</div>
+          <div className="text-gray-300 space-y-2">{formatRecommendations(recommendations)}</div>
         </div>
 
-        {/* Download Button */}
         <div className="flex justify-end">
           <button
             onClick={downloadReport}
@@ -757,15 +812,15 @@ Use formal language and ensure the report is easy to understand for both technic
       </style>
       {loading ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100px' }}>
-          <p>Image is processing...</p>
-          <div style={{
-            width: '100%',
-            height: '15px',
-            background: 'linear-gradient(to right, #4caf50 0%, #4caf50 50%, #ccc 50%, #ccc 100%)',
-            backgroundSize: '200% 100%',
-            animation: 'loading 1.5s infinite'
-          }}></div>
-        </div>
+        <p>Image is processing...</p>
+        <div style={{
+          width: '100%',
+          height: '15px',
+          background: 'linear-gradient(to right, #4caf50 0%, #4caf50 50%, #ccc 50%, #ccc 100%)',
+          backgroundSize: '200% 100%',
+          animation: 'loading 1.5s infinite'
+        }}></div>
+      </div>
       ) : (
         <div>
           <PageHeader title="File Analysis" />
@@ -801,7 +856,6 @@ Use formal language and ensure the report is easy to understand for both technic
         </div>
       )}
 
-      {/* Floating Chatbot Icon */}
       <div
         style={{
           position: 'fixed',
@@ -828,7 +882,6 @@ Use formal language and ensure the report is easy to understand for both technic
         </button>
       </div>
 
-      {/* Chatbox */}
       {chatOpen && (
         <div
           ref={chatBoxRef}
