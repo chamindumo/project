@@ -1,10 +1,11 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { FileDropZone } from '../components/FileDropZone';
 import { FilePreview } from '../components/FilePreview';
 import { PageHeader } from '../components/PageHeader';
 import { useFileHistory, HistoryItem } from '../hooks/useFileHistory';
 import { useOutletContext } from 'react-router-dom';
 import { PDFPreview } from '../components/PDFPreview';
+import jsPDF from 'jspdf';
 
 export function AnalyzePage() {
   const { addToHistory, updateHistoryItem } = useFileHistory();
@@ -15,6 +16,11 @@ export function AnalyzePage() {
   const [currentFileId, setCurrentFileId] = useState<string | null>(null);
   const [recommendations, setRecommendations] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [chatResponse, setChatResponse] = useState<string | null>(null);
+  const [chatMessages, setChatMessages] = useState<{ role: string; content: string }[]>([]);
+  const chatBoxRef = useRef<HTMLDivElement>(null);
 
   const { ref } = useOutletContext<{ ref: (instance: any) => void }>();
 
@@ -53,20 +59,37 @@ export function AnalyzePage() {
     reader.readAsDataURL(droppedFile);
   }, [addToHistory]);
 
-  const fetchChatCompletion = async (analysisResults:string, iqa:string) => {
+  const fetchChatCompletion = async (analysisResults: string, iqa: string) => {
+    const apiKey = import.meta.env.REACT_APP_API_KEY;
+    if (!apiKey) {
+      console.error('API key is missing. Ensure REACT_APP_API_KEY is set in the .env file.');
+      throw new Error('API key is missing.');
+    }
+
     try {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
-          Authorization: 'Bearer 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',
+          Authorization: `Bearer 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`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'openai/gpt-3.5-turbo-instruct',
+          model: 'google/gemini-2.0-flash-lite-preview-02-05:free',
           messages: [
             {
               role: 'user',
-              content: `genarate the detail report the stegoimage algorithem is ${analysisResults} and the image qulity is (IQA value ) ${iqa} so give the very detaild recomndataion with formal language`,
+              content: `You are an expert in image analysis and steganography. Based on the following details:
+              
+- Stegoimage Algorithm: ${analysisResults}
+- Image Quality Assessment (IQA) Score: ${iqa}
+
+Please generate a detailed and professional report. The report should include:
+1. A brief explanation of the stegoimage algorithm.
+2. An assessment of the image quality based on the IQA score.
+3. Recommendations for improving the image quality or steganographic process.
+4. Any potential risks or vulnerabilities associated with the current analysis.
+
+Use formal language and ensure the report is easy to understand for both technical and non-technical audiences.`,
             },
           ],
         }),
@@ -150,41 +173,138 @@ export function AnalyzePage() {
     }
   }, [file, currentFileId, preview, updateHistoryItem]);
 
+  const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const handleChatSubmit = async () => {
+    if (!chatInput.trim()) return;
+  
+    const newUserMessage = { role: 'user', content: chatInput };
+    const updatedMessages = [...chatMessages, newUserMessage];
+  
+    setChatMessages(updatedMessages);
+    setChatInput('');
+  
+    if (chatBoxRef.current) {
+      chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
+    }
+  
+    try {
+      // Add a 1-second delay to avoid rate limits
+      await delay(1000);
+  
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer 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`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.0-flash-lite-preview-02-05:free',
+          messages: updatedMessages,
+        }),
+      });
+  
+      const chatCompletion = await response.json();
+  
+      if (chatCompletion.choices && chatCompletion.choices.length > 0) {
+        console.log('No choices in response:', chatCompletion);
+        const botResponse = chatCompletion.choices[0].message.content;
+        setChatMessages((prevMessages) => [...prevMessages, { role: 'assistant', content: botResponse }]);
+      } else {
+        console.log('No choices in response:', chatCompletion);
+        console.error('No choices in response:', chatCompletion);
+        setChatMessages((prevMessages) => [
+          ...prevMessages,
+          { role: 'assistant', content: 'No response received. Please try again.' },
+        ]);
+      }
+    } catch (error) {
+      console.error('Error fetching chat response:', error);
+      setChatMessages((prevMessages) => [
+        ...prevMessages,
+        { role: 'assistant', content: 'Error occurred while fetching the response.' },
+      ]);
+    }
+  };
+
+  // Automatically scroll to the bottom of the chat when a new message is added
+  useEffect(() => {
+    if (chatBoxRef.current) {
+      chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
+    }
+  }, [chatMessages]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (chatBoxRef.current && !chatBoxRef.current.contains(event.target as Node)) {
+        setChatOpen(false); // Close the chatbot if clicked outside
+      }
+    };
+  
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [chatBoxRef]);
+
+  const formatRecommendations = (recommendations: string) => {
+    return recommendations.split('\n').map((line, i) => (
+      <p key={i} style={{ margin: '5px 0' }}>
+        {line.startsWith('-') ? (
+          <strong>{line}</strong> // Bold headings
+        ) : line.includes('**') ? (
+          <span>
+            {line.split(/(\*\*.*?\*\*)/).map((part, j) =>
+              part.startsWith('**') && part.endsWith('**') ? (
+                <strong key={j}>{part.slice(2, -2)}</strong> // Bold text inside **
+              ) : (
+                part
+              )
+            )}
+          </span>
+        ) : line.startsWith('* **') ? (
+          <span>
+            <strong>Point:</strong> {line.slice(1).trim()} {/* Add "Point:" for this specific case */}
+          </span>
+        ) : (
+          line
+        )}
+      </p>
+    ));
+  };
+
   const renderReport = () => {
     if (!file || !analysis || !recommendations) return null;
-
+  
     const fileDetails = `
-- File Name: ${file.name}
-- File Size: ${(file.size / 1024).toFixed(2)} KB
-- Last Modified: ${new Date(file.lastModified).toLocaleDateString()}
+  File Name: ${file.name}
+  File Size: ${(file.size / 1024).toFixed(2)} KB
+  Last Modified: ${new Date(file.lastModified).toLocaleDateString()}
     `;
-
+  
     const analysisResults = `
-- Payload Classification: ${analysis.payload_class}
-- IQA Score: ${analysis.iqa_score.toFixed(2)}
+  Payload Classification: ${analysis.payload_class}
+  IQA Score: ${analysis.iqa_score.toFixed(2)}
     `;
-
-    const downloadReport = async () => {
-      const reportContent = `
-File Details:
-${fileDetails}
-
-Analysis Results:
-${analysisResults}
-
-Recommendations:
-${recommendations}
-      `;
-
-      const blob = new Blob([reportContent || ''], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${file.name}_analysis_report.txt`;
-      a.click();
-      URL.revokeObjectURL(url);
+  
+    const formattedRecommendations = formatRecommendations(recommendations);
+  
+    const downloadReport = () => {
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.text('Analysis Report', 10, 10);
+      doc.setFontSize(12);
+      doc.text('--- File Details ---', 10, 20);
+      doc.text(fileDetails, 10, 30);
+      doc.text('--- Analysis Results ---', 10, 50);
+      doc.text(analysisResults, 10, 60);
+      doc.text('--- Recommendations ---', 10, 80);
+      const recommendationsText = recommendations.split('\n'); // Convert recommendations to an array of strings
+      doc.text(recommendationsText, 10, 90);
+      doc.text(`Generated on: ${new Date().toLocaleString()}`, 10, 110);
+      doc.save(`${file.name}_analysis_report.pdf`);
     };
-
+  
     return (
       <div className="bg-gray-900 shadow-md rounded-lg p-6 space-y-4 text-white">
         {/* File Details */}
@@ -203,7 +323,7 @@ ${recommendations}
             </li>
           </ul>
         </div>
-
+  
         {/* Analysis Results */}
         <div>
           <h3 className="text-lg font-bold text-blue-300">Analysis Results</h3>
@@ -214,7 +334,7 @@ ${recommendations}
               <li>
                 <strong>Payload Classification:</strong>{' '}
                 <span className="font-semibold text-blue-400">
-                   {analysis.payload_class}
+                  {analysis.payload_class}
                 </span>
               </li>
               <li>
@@ -226,15 +346,15 @@ ${recommendations}
             </ul>
           )}
         </div>
-
+  
         {/* Recommendations */}
         <div>
           <h3 className="text-lg font-bold text-blue-300">Recommendations</h3>
-          <ul className="mt-2 space-y-1 text-sm text-gray-300">
-            <li>{recommendations}</li>
-          </ul>
+          <div className="mt-2 space-y-1 text-sm text-gray-300">
+            {formattedRecommendations}
+          </div>
         </div>
-
+  
         {/* Download Button */}
         <div className="flex justify-end">
           <button
@@ -247,6 +367,7 @@ ${recommendations}
       </div>
     );
   };
+  
 
   return (
     <div>
@@ -297,6 +418,169 @@ ${recommendations}
           )}
         </div>
       )}
+
+      {/* Floating Chatbot Icon */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          zIndex: 1000,
+        }}
+      >
+        <button
+          onClick={() => setChatOpen(!chatOpen)}
+          style={{
+            backgroundColor: '#007bff', // Changed to blue
+            borderRadius: '50%',
+            width: '60px',
+            height: '60px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+            cursor: 'pointer',
+          }}
+        >
+          <span style={{ fontSize: '24px', color: 'white' }}>💬</span>
+        </button>
+      </div>
+
+      {/* Chatbox */}
+      {chatOpen && (
+        <div
+          ref={chatBoxRef}
+          style={{
+            position: 'fixed',
+            bottom: '20px',
+            right: '20px',
+            width: '400px', // Increased width
+            height: '500px', // Increased height
+            backgroundColor: '#001f3f', // Dark blue background
+            borderRadius: '10px',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+            overflow: 'hidden',
+            animation: 'fadeIn 0.3s ease-in-out',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              padding: '10px',
+              backgroundColor: '#007bff', // Header remains blue
+              color: 'white',
+              fontWeight: 'bold',
+              textAlign: 'center',
+            }}
+          >
+            Chatbot
+          </div>
+          <div
+            style={{
+              padding: '10px',
+              height: '380px', // Adjusted height for larger chat area
+              overflowY: 'auto',
+              borderBottom: '1px solid #ddd',
+              color: 'white', // Text color for dark background
+            }}
+          >
+            {chatMessages.map((message, index) => (
+              <div
+                key={index}
+                style={{
+                  marginBottom: '10px',
+                  textAlign: message.role === 'user' ? 'right' : 'left',
+                }}
+              >
+                <span
+                  style={{
+                    display: 'inline-block',
+                    padding: '10px 15px',
+                    borderRadius: '10px',
+                    backgroundColor: message.role === 'user' ? '#007bff' : '#004080', // User messages blue, bot messages darker blue
+                    color: 'white',
+                    maxWidth: '80%',
+                    wordWrap: 'break-word',
+                    textAlign: 'left', // Align text to the left
+                  }}
+                >
+                  {message.content.split('\n').map((line, i) => (
+                    <p key={i} style={{ margin: '5px 0' }}>
+                      {line.startsWith('-') ? (
+                        <strong>{line}</strong> // Bold headings
+                      ) : line.includes('**') ? (
+                        <span>
+                          {line.split(/(\*\*.*?\*\*)/).map((part, j) =>
+                            part.startsWith('**') && part.endsWith('**') ? (
+                              <strong key={j}>{part.slice(2, -2)}</strong> // Bold text inside **
+                            ) : (
+                              part
+                            )
+                          )}
+                        </span>
+                      ) : line.startsWith('* **') ? (
+                        <span>
+                          <strong>Point:</strong> {line.slice(1).trim()} {/* Add "Point:" for this specific case */}
+                        </span>
+                      ) : (
+                        line
+                      )}
+                    </p>
+                  ))}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', padding: '10px', borderTop: '1px solid #ddd', alignItems: 'center' }}>
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              placeholder="Type your message..."
+              style={{
+                flex: 1,
+                padding: '10px',
+                border: '1px solid #ddd',
+                borderRadius: '5px',
+                marginRight: '10px',
+                color: 'black', // Changed text color to black
+              }}
+            />
+            <button
+              onClick={handleChatSubmit}
+              style={{
+                backgroundColor: '#007bff', // Button remains blue
+                color: 'white',
+                border: 'none',
+                borderRadius: '50%', // Circular button
+                width: '40px',
+                height: '40px',
+                display: 'flex',
+                alignItems: 'center', // Center vertically
+                justifyContent: 'center', // Center horizontally
+                cursor: 'pointer',
+              }}
+            >
+              <span style={{ fontSize: '20px' }}>➤</span> {/* Send icon */}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <style>
+        {`
+          @keyframes fadeIn {
+            from {
+              opacity: 0;
+              transform: translateY(20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+        `}
+      </style>
     </div>
   );
 }
