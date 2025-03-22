@@ -530,15 +530,6 @@ Use formal language and ensure the report is easy to understand for both technic
         addFormattedText(text, margin, indent);
       };
 
-      const addBulletPoint = (text: string, indentLevel: number = 1) => {
-        const indent = indentLevel * 5;
-        checkPageOverflow(5);
-        doc.setFontSize(12);
-        doc.setTextColor(textColor);
-        doc.text('•', margin + indent - 5, yPosition);
-        addFormattedText(text, margin, indent);
-      };
-
       const checkPageOverflow = (additionalHeight: number) => {
         if (yPosition + additionalHeight > pageHeight - margin - 10) {
           doc.addPage();
@@ -654,18 +645,10 @@ Use formal language and ensure the report is easy to understand for both technic
           indentLevel = 2;
         } else if (trimmedLine.startsWith('* **')) {
           const bulletText = trimmedLine.slice(4).trim();
-          if (inPotentialCauses) {
-            addNumberedPoint(`Point: ${bulletText}`, potentialCausesPointNumber++, indentLevel);
-          } else {
-            addNumberedPoint(`Point: ${bulletText}`, sectionPointNumber++, indentLevel);
-          }
+         addParagraph(bulletText, indentLevel);
         } else if (trimmedLine.startsWith('-')) {
           const bulletText = trimmedLine.slice(1).trim();
-          if (inPotentialCauses) {
-            addNumberedPoint(bulletText, potentialCausesPointNumber++, indentLevel);
-          } else {
-            addNumberedPoint(bulletText, sectionPointNumber++, indentLevel);
-          }
+         addParagraph(bulletText, indentLevel);
         } else if (trimmedLine.startsWith('*') && !trimmedLine.startsWith('* **')) {
           const bulletText = trimmedLine.slice(1).trim();
           addParagraph(bulletText, indentLevel);
