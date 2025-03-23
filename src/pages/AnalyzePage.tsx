@@ -273,10 +273,10 @@ Use formal language and ensure the report is easy to understand for both technic
   const formatRecommendations = (recommendations: string) => {
     const lines = recommendations.split('\n').filter(line => line.trim() !== '');
     let sectionCount = 0;
-
+  
     return lines.map((line, i) => {
       const trimmedLine = line.trim();
-
+  
       if (trimmedLine.startsWith('##')) {
         sectionCount++;
         return (
@@ -285,16 +285,29 @@ Use formal language and ensure the report is easy to understand for both technic
           </div>
         );
       } else if (trimmedLine.startsWith('-') || trimmedLine.startsWith('*')) {
-        const content = trimmedLine.startsWith('-') ? trimmedLine.slice(1).trim() : trimmedLine.slice(1).trim();
+        // Remove the leading '-' or '*' and trim the content
+        const content = trimmedLine.startsWith('-') 
+          ? trimmedLine.slice(1).trim() 
+          : trimmedLine.slice(1).trim();
+        
+        // Handle bold text within the content (e.g., **text**)
+        if (content.includes('*')) {
+          const parts = content.split(/(\*\*.*?\*\*)/);
+          return (
+            <li key={i} className="ml-6 text-gray-300 list-decimal">
+              {parts.map((part, j) =>
+                part.startsWith('*') && part.endsWith('**') ? (
+                  <strong key={j}>{part.slice(2, -2)}</strong>
+                ) : (
+                  part
+                )
+              )}
+            </li>
+          );
+        }
         return (
           <li key={i} className="ml-6 text-gray-300 list-decimal">
-            {trimmedLine.startsWith('* **') ? (
-              <span>
-                <strong>Point:</strong> {trimmedLine.slice(4).trim()}
-              </span>
-            ) : (
-              <strong>{content}</strong>
-            )}
+            {content}
           </li>
         );
       } else if (trimmedLine.includes('**')) {
