@@ -6,10 +6,9 @@ import { useFileHistory, HistoryItem } from '../hooks/useFileHistory';
 import { useOutletContext } from 'react-router-dom';
 import { PDFPreview } from '../components/PDFPreview';
 import jsPDF from 'jspdf';
-import { Doughnut, Pie } from 'react-chartjs-2'; // Import Doughnut and Pie charts
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'; // Import Chart.js components
+import { Doughnut, Pie } from 'react-chartjs-2';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 
-// Register Chart.js components
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 export function AnalyzePage() {
@@ -273,42 +272,51 @@ Use formal language and ensure the report is easy to understand for both technic
   const formatRecommendations = (recommendations: string) => {
     const lines = recommendations.split('\n').filter(line => line.trim() !== '');
     let sectionCount = 0;
-  
+
     return lines.map((line, i) => {
       const trimmedLine = line.trim();
-  
-      if (trimmedLine.startsWith('##')) {
+
+      if (trimmedLine.startsWith('**') && trimmedLine.endsWith('**')) {
+        // Handle section headings like **3.2. Stegoimage Algorithm Explanation: JMIPOD**
         sectionCount++;
+        const content = trimmedLine.slice(2, -2).trim(); // Remove ** from start and end
+        // Remove any nested numbering (e.g., "3.2.") and keep only the title
+        const title = content.replace(/^\d+\.\d+\.\s*/, '').trim();
         return (
           <div key={i} className="mt-6">
-            <h4 className="text-xl font-semibold text-blue-400">{`${sectionCount}. ${trimmedLine.slice(2).trim()}`}</h4>
+            <h4 className="text-xl font-semibold text-blue-400">{`${title}`}</h4>
+          </div>
+        );
+      } else if (trimmedLine.startsWith('##')) {
+        // Fallback for headings marked with ## (if any)
+        sectionCount++;
+        const title = trimmedLine.slice(2).replace(/^\d+\.\d+\.\s*/, '').trim();
+        return (
+          <div key={i} className="mt-6">
+            <h4 className="text-xl font-semibold text-blue-400">{`${sectionCount}. ${title}`}</h4>
           </div>
         );
       } else if (trimmedLine.startsWith('-') || trimmedLine.startsWith('*')) {
-        // Remove the leading '-' or '*' and trim the content
         const content = trimmedLine.startsWith('-') 
           ? trimmedLine.slice(1).trim() 
           : trimmedLine.slice(1).trim();
         
-        // Handle bold text within the content (e.g., **text**)
-        if (content.includes('*')) {
+        if (content.includes('**')) {
           const parts = content.split(/(\*\*.*?\*\*)/);
           return (
-            <li key={i} className="ml-6 text-gray-300 list-decimal">
+            <p key={i} className="ml-6 text-gray-300 mt-2">
               {parts.map((part, j) =>
-                part.startsWith('*') && part.endsWith('**') ? (
+                part.startsWith('**') && part.endsWith('**') ? (
                   <strong key={j}>{part.slice(2, -2)}</strong>
                 ) : (
                   part
                 )
               )}
-            </li>
+            </p>
           );
         }
         return (
-          <li key={i} className="ml-6 text-gray-300 list-decimal">
-            {content}
-          </li>
+          <p key={i} className="ml-6 text-gray-300 mt-2">{content}</p>
         );
       } else if (trimmedLine.includes('**')) {
         const parts = trimmedLine.split(/(\*\*.*?\*\*)/);
@@ -352,35 +360,29 @@ Use formal language and ensure the report is easy to understand for both technic
       { src: analysis.noise_residual, caption: "Noise Residual" },
     ];
 
-    // Prepare data for the Class Probabilities circular progress charts
     const classChartOptions = {
       responsive: true,
-      cutout: '80%', // Makes the doughnut chart a thin ring
+      cutout: '80%',
       plugins: {
-        legend: {
-          display: false, // Hide the legend
-        },
-        tooltip: {
-          enabled: false, // Disable tooltips
-        },
-        // Custom plugin to display percentage in the center
+        legend: { display: false },
+        tooltip: { enabled: false },
         centerText: {
           id: 'centerText',
           afterDatasetsDraw(chart: any) {
             const { ctx, chartArea: { width, height } } = chart;
             ctx.save();
             ctx.font = 'bold 24px Helvetica';
-            ctx.fillStyle = '#D1D5DB'; // Tailwind gray-300
+            ctx.fillStyle = '#D1D5DB';
             ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
+            ctx.textBaseline= 'middle';
             const text = chart.data.datasets[0].data[0] + '%';
             ctx.fillText(text, width / 2, height / 2);
             ctx.restore();
           },
         },
       },
-      rotation: -90, // Start the progress from the top
-      circumference: 360, // Full circle
+      rotation: -90,
+      circumference: 360,
     };
 
     const classProbabilitiesCharts = Object.entries(analysisResults.classProbabilities).map(([className, prob]) => {
@@ -389,10 +391,10 @@ Use formal language and ensure the report is easy to understand for both technic
         labels: [className],
         datasets: [
           {
-            data: [percentage, 100 - parseFloat(percentage)], // Progress and remaining
-            backgroundColor: ['#FF0000', '#E5E7EB'], // Red for progress, gray for background
+            data: [percentage, 100 - parseFloat(percentage)],
+            backgroundColor: ['#FF0000', '#E5E7EB'],
             borderWidth: 0,
-            borderColor: '#FFFFFF', // White gap
+            borderColor: '#FFFFFF',
             borderAlign: 'inner' as const,
           },
         ],
@@ -400,7 +402,6 @@ Use formal language and ensure the report is easy to understand for both technic
       return { className, percentage, chartData };
     });
 
-    // Prepare data for the IQA pie chart
     const iqaPercentage = (parseFloat(analysisResults.iqaScore) * 100).toFixed(2);
     const iqaChartData = {
       labels: ['IQA', 'Remaining'],
@@ -408,7 +409,7 @@ Use formal language and ensure the report is easy to understand for both technic
         {
           label: 'Image Quality Assessment',
           data: [iqaPercentage, 100 - parseFloat(iqaPercentage)],
-          backgroundColor: ['#36A2EB', '#E5E7EB'], // Blue for IQA, gray for remaining
+          backgroundColor: ['#36A2EB', '#E5E7EB'],
           hoverBackgroundColor: ['#36A2EB', '#E5E7EB'],
         },
       ],
@@ -417,9 +418,7 @@ Use formal language and ensure the report is easy to understand for both technic
     const iqaChartOptions = {
       responsive: true,
       plugins: {
-        legend: {
-          display: false, // Hide the legend
-        },
+        legend: { display: false },
         tooltip: {
           callbacks: {
             label: (context: any) => `${context.label}: ${context.raw}%`,
@@ -437,10 +436,10 @@ Use formal language and ensure the report is easy to understand for both technic
       let yPosition = margin;
 
       const headerColor = '#1E3A8A';
-      const sectionHeaderColor = '#2563EB'; // Heading 1 color
-      const subHeaderColor = '#4B5EAA'; // Heading 2 color
+      const sectionHeaderColor = '#2563EB';
+      const subHeaderColor = '#4B5EAA';
       const textColor = '#000000';
-      const lineSpacing = 1.5; // Set line spacing to 1.5
+      const lineSpacing = 1.5;
 
       const addText = (text: string, x: number, y: number, fontSize: number, isBold: boolean = false, color: string = textColor) => {
         doc.setFontSize(fontSize);
@@ -459,13 +458,13 @@ Use formal language and ensure the report is easy to understand for both technic
 
       const addMainSectionHeading = (heading: string) => {
         checkPageOverflow(20);
-        yPosition = addText(heading, margin, yPosition, 16, true, sectionHeaderColor); // Heading 1, bold
+        yPosition = addText(heading, margin, yPosition, 16, true, sectionHeaderColor);
         yPosition += 4;
       };
 
       const addSubHeading = (heading: string, indent: number = 0) => {
         checkPageOverflow(15);
-        yPosition = addText(heading, margin + indent, yPosition, 14, true, subHeaderColor); // Heading 2, bold
+        yPosition = addText(heading, margin + indent, yPosition, 14, true, subHeaderColor);
         yPosition += 2;
       };
 
@@ -570,7 +569,6 @@ Use formal language and ensure the report is easy to understand for both technic
         }
       };
 
-      // Cover Page
       doc.setFontSize(24);
       doc.setTextColor(headerColor);
       doc.setFont("helvetica", "bold");
@@ -586,17 +584,15 @@ Use formal language and ensure the report is easy to understand for both technic
 
       yPosition = margin + 15;
 
-      // 1. File Details
       addSectionHeading("1. File Details");
       addParagraph(`File Name: ${fileDetails.fileName}`);
       addParagraph(`File Size: ${fileDetails.fileSize}`);
       addParagraph(`Last Modified: ${fileDetails.lastModified}`);
       yPosition += 5;
 
-      // 2. Analysis Results
       addSectionHeading("2. Analysis Results");
       addParagraph(`Payload Classification: ${analysisResults.payloadClass}`);
-      addSubHeading("Class Probabilities:", 5); // Heading 2 style
+      addSubHeading("Class Probabilities:", 5);
       let pointNumber = 1;
       Object.entries(analysisResults.classProbabilities).forEach(([className, prob]) => {
         addNumberedPoint(`${className}: ${((prob as number) * 100).toFixed(2)}%`, pointNumber++, 2);
@@ -604,7 +600,6 @@ Use formal language and ensure the report is easy to understand for both technic
       addParagraph(`IQA Score: ${analysisResults.iqaScore}`);
       yPosition += 5;
 
-      // 3. Filtered Images
       addSectionHeading("3. Filtered Images");
       const imgWidth = 60;
       const imgHeight = 60;
@@ -622,7 +617,6 @@ Use formal language and ensure the report is easy to understand for both technic
       });
       yPosition += imgHeight + 15;
 
-      // 4. Original Image
       if (preview) {
         addSectionHeading("4. Original Image");
         const imgWidth = 180;
@@ -632,13 +626,12 @@ Use formal language and ensure the report is easy to understand for both technic
         yPosition += imgHeight + 10;
       }
 
-      // 5. Detailed Analysis (Recommendations)
-      let sectionCount = 4; // Start from 5 since we already have 4 sections
+      let sectionCount = 4;
       const recommendationLines = recommendations.split('\n').filter(line => line.trim() !== '');
       let indentLevel = 1;
       let inPotentialCauses = false;
       let potentialCausesPointNumber = 1;
-      let sectionPointNumber = 1; // For numbering points in other sections
+      let sectionPointNumber = 1;
 
       recommendationLines.forEach((line) => {
         const trimmedLine = line.trim();
@@ -649,19 +642,19 @@ Use formal language and ensure the report is easy to understand for both technic
           sectionCount++;
           inPotentialCauses = false;
           indentLevel = 1;
-          potentialCausesPointNumber = 1; // Reset point number for Potential Causes
-          sectionPointNumber = 1; // Reset point number for new section
-          addMainSectionHeading(`${sectionCount}. ${trimmedLine.slice(2).trim()}`); // Heading 1, bold
+          potentialCausesPointNumber = 1;
+          sectionPointNumber = 1;
+          addMainSectionHeading(`${sectionCount}. ${trimmedLine.slice(2).trim()}`);
         } else if (trimmedLine === 'Potential Causes:') {
           inPotentialCauses = true;
-          addSubHeading(trimmedLine, 5); // Heading 2 style, bold
+          addSubHeading(trimmedLine, 5);
           indentLevel = 2;
         } else if (trimmedLine.startsWith('* **')) {
           const bulletText = trimmedLine.slice(4).trim();
-         addParagraph(bulletText, indentLevel);
+          addParagraph(bulletText, indentLevel);
         } else if (trimmedLine.startsWith('-')) {
           const bulletText = trimmedLine.slice(1).trim();
-         addParagraph(bulletText, indentLevel);
+          addParagraph(bulletText, indentLevel);
         } else if (trimmedLine.startsWith('*') && !trimmedLine.startsWith('* **')) {
           const bulletText = trimmedLine.slice(1).trim();
           addParagraph(bulletText, indentLevel);
@@ -675,7 +668,7 @@ Use formal language and ensure the report is easy to understand for both technic
       }
       addFooter();
 
-      doc.save(`${file.name}_analysis_report.pdf`);
+      doc.save(`analysis_report_${file.name}_.pdf`);
     };
 
     return (
@@ -683,16 +676,9 @@ Use formal language and ensure the report is easy to understand for both technic
         <div className="border-b border-gray-700 pb-4">
           <h3 className="text-2xl font-bold text-blue-400 mb-3">File Details</h3>
           <ul className="space-y-2 text-gray-300">
-            <li>
-              <span className="font-semibold text-blue-200">File Name:</span> {file.name}
-            </li>
-            <li>
-              <span className="font-semibold text-blue-200">File Size:</span> {(file.size / 1024).toFixed(2)} KB
-            </li>
-            <li>
-              <span className="font-semibold text-blue-200">Last Modified:</span>{' '}
-              {new Date(file.lastModified).toLocaleDateString()}
-            </li>
+            <li><span className="font-semibold text-blue-200">File Name:</span> {file.name}</li>
+            <li><span className="font-semibold text-blue-200">File Size:</span> {(file.size / 1024).toFixed(2)} KB</li>
+            <li><span className="font-semibold text-blue-200">Last Modified:</span> {new Date(file.lastModified).toLocaleDateString()}</li>
           </ul>
         </div>
 
@@ -804,19 +790,75 @@ Use formal language and ensure the report is easy to understand for both technic
               transform: rotate(360deg);
             }
           }
+          @keyframes pulse {
+            0% {
+              transform: scale(1);
+              box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+            }
+            50% {
+              transform: scale(1.05);
+              box-shadow: 0 0 20px rgba(76, 175, 80, 0.8);
+            }
+            100% {
+              transform: scale(1);
+              box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+            }
+          }
         `}
       </style>
       {loading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100px' }}>
-        <p>Image is processing...</p>
-        <div style={{
-          width: '100%',
-          height: '15px',
-          background: 'linear-gradient(to right, #4caf50 0%, #4caf50 50%, #ccc 50%, #ccc 100%)',
-          backgroundSize: '200% 100%',
-          animation: 'loading 1.5s infinite'
-        }}></div>
-      </div>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100vh',
+            backgroundColor: 'rgba(0, 0, 0, 0.2)',
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 999,
+          }}
+        >
+          <div
+            style={{
+              width: '80px',
+              height: '80px',
+              borderRadius: '50%',
+              background: 'conic-gradient(from 0deg, #4caf50, #36A2EB, #4caf50)',
+              position: 'relative',
+              animation: 'spin 1.5s linear infinite, pulse 1.5s ease-in-out infinite',
+            }}
+          >
+            <div
+              style={{
+                content: '""',
+                position: 'absolute',
+                top: '5px',
+                left: '5px',
+                right: '5px',
+                bottom: '5px',
+                backgroundColor: '#1E3A8A',
+                borderRadius: '50%',
+              }}
+            />
+          </div>
+          <p
+            style={{
+              marginTop: '20px',
+              color: '#fff',
+              fontSize: '18px',
+              fontWeight: 'bold',
+              textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
+              animation: 'fadeIn 0.5s ease-in-out',
+            }}
+          >
+            Processing Image...
+          </p>
+        </div>
       ) : (
         <div>
           <PageHeader title="File Analysis" />
