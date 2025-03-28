@@ -40,7 +40,7 @@ export function FileHistory({
       {history.length === 0 ? (
         <p className="text-gray-400">No files have been analyzed yet</p>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4 max-h-[620px] overflow-y-auto scrollbar-hide">
           {history.map((item) => (
             <div
               key={item.id}

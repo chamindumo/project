@@ -1,4 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { FileDropZone } from '../components/FileDropZone';
 import { FilePreview } from '../components/FilePreview';
 import { PageHeader } from '../components/PageHeader';
@@ -26,6 +28,18 @@ export function AnalyzePage() {
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatBoxRef = useRef<HTMLDivElement>(null);
   const { ref, selectedHistoryItem } = useOutletContext<{ ref: (instance: any) => void; selectedHistoryItem: any }>();
+  const location = useLocation();
+  
+  const resetAnalysis = () => {
+    setFile(null);
+    setPreview(null);
+    setAnalysis(null);
+    setRecommendations(null);
+    setCurrentFileId(null);
+    setError(null);
+  };
+
+  
 
   const handleFileDrop = useCallback((droppedFile: File) => {
     setError(null);
@@ -60,6 +74,9 @@ export function AnalyzePage() {
     };
     reader.readAsDataURL(droppedFile);
   }, [addToHistory]);
+
+  
+
 
   const fetchChatCompletion = async (analysisResults: string, iqa: string) => {
     try {
@@ -339,6 +356,7 @@ Use formal language and ensure the report is easy to understand for both technic
     });
   };
 
+  
   const renderReport = () => {
     if (!file || !analysis || !recommendations) return null;
 
@@ -671,6 +689,7 @@ Use formal language and ensure the report is easy to understand for both technic
       doc.save(`analysis_report_${file.name}_.pdf`);
     };
 
+    
     return (
       <div className="bg-gray-900 shadow-lg rounded-lg p-8 space-y-6 text-white max-w-4xl mx-auto">
         <div className="border-b border-gray-700 pb-4">
@@ -750,16 +769,9 @@ Use formal language and ensure the report is easy to understand for both technic
       </div>
     );
   };
-
-  const resetAnalysis = () => {
-    setFile(null);
-    setPreview(null);
-    setAnalysis(null);
-    setRecommendations(null);
-    setCurrentFileId(null);
-    setError(null);
-  };
-
+  
+ 
+  
   return (
     <div>
       <style>

@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Lock, Clock, BarChart } from 'lucide-react'; // Import additional icons from lucide-react
 import { Link } from 'react-router-dom';
 
 export function HomePage() {
   const navigate = useNavigate();
+  const [refreshKey, setRefreshKey] = useState(0); // State to trigger re-rendering
 
   // Sample data for "Why Choose Us" section
   const features = [
@@ -38,15 +39,23 @@ export function HomePage() {
     { className: '', prob: -Infinity }
   ).className;
 
+  // Function to handle smooth "refresh"
+  const handleStartAnalysis = () => {
+    // Use the key change to trigger a smooth refresh
+    setRefreshKey((prevKey) => prevKey + 1); 
+    // Optionally navigate or do something after refresh
+    navigate('/analyze');
+  };
+
   return (
-    <div className="bg-gradient-to-b from-gray-900 to-gray-800 flex flex-col items-center">
+    <div className="bg-gradient-to-b from-gray-900 to-gray-800 flex flex-col items-center" key={refreshKey}>
       {/* Hero Section */}
       <div className="relative w-full min-h-[calc(100vh-128px)] flex flex-col items-center justify-center text-center px-4 py-16">
         {/* Background Overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-gray-900/80 to-gray-800/80 z-0"></div>
 
         {/* Content */}
-        <div className="relative z-10 max-w-4xl animate-slideIn">
+        <div className="relative z-10 max-w-4xl animate-fadeIn">
           <Shield className="h-24 w-24 text-cyan-500 mb-8 mx-auto animate-pulse" />
           <h1 className="text-5xl md:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 mb-6 tracking-tight">
             Secure File Analysis Platform
@@ -56,7 +65,7 @@ export function HomePage() {
           </p>
           <div className="flex justify-center gap-4">
             <button
-              onClick={() => navigate('/analyze')}
+              onClick={handleStartAnalysis} // Use the smooth refresh function here
               className="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-3 px-8 rounded-full shadow-lg transition-all duration-300 transform hover:scale-105"
             >
               Start Analysis
@@ -160,55 +169,3 @@ export function HomePage() {
     </div>
   );
 }
-
-// CSS Animations for Slide-In, Fade-In, and Pulse Effects
-const styles = `
-  @keyframes slideIn {
-    from {
-      opacity: 0;
-      transform: translateY(30px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-
-  @keyframes pulse {
-    0% {
-      transform: scale(1);
-    }
-    50% {
-      transform: scale(1.1);
-    }
-    100% {
-      transform: scale(1);
-    }
-  }
-
-  .animate-slideIn {
-    animation: slideIn 0.8s ease-out forwards;
-  }
-
-  .animate-fadeIn {
-    animation: fadeIn 1s ease-out forwards;
-  }
-
-  .animate-pulse {
-    animation: pulse 2s infinite ease-in-out;
-  }
-`;
-
-// Inject the styles into the document
-const styleSheet = document.createElement('style');
-styleSheet.innerText = styles;
-document.head.appendChild(styleSheet);

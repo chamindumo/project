@@ -1,4 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
+import { db } from '../hooks/firebaseConfig';
+import {
+  collection,
+  doc,
+  setDoc,
+  getDoc,
+  getDocs,
+  updateDoc,
+  deleteDoc,
+} from 'firebase/firestore';
 
 export interface HistoryItem {
   id: string;
@@ -8,112 +18,122 @@ export interface HistoryItem {
   status: 'analyzed' | 'pending';
   preview?: string;
   analysis?: string;
-  report?: string; // Add a field for the report
+  report?: string; 
 }
 
-const STORAGE_KEY = 'file-analysis-history';
-
-// Create a custom event for history updates
-const HISTORY_UPDATE_EVENT = 'fileHistoryUpdate';
+const COLLECTION_NAME = 'file-analysis-history';
 
 export function useFileHistory() {
-  const [history, setHistory] = useState<HistoryItem[]>(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      return parsed.map((item: any) => ({
-        ...item,
-        timestamp: new Date(item.timestamp)
-      }));
-    }
-    return [];
-  });
+  const [history, setHistory] = useState<HistoryItem[]>([]);
 
-  // Handle history updates from other components
+  
   useEffect(() => {
-    const handleHistoryUpdate = () => {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setHistory(parsed.map((item: any) => ({
-          ...item,
-          timestamp: new Date(item.timestamp)
-        })));
+    const fetchHistory = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, COLLECTION_NAME));
+        const items: HistoryItem[] = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          timestamp: new Date(doc.data().timestamp),
+        }) as HistoryItem);
+        setHistory(items);
+      } catch (error) {
+        console.error('Error fetching history:', error);
       }
     };
 
-    // Listen for history updates
-    window.addEventListener(HISTORY_UPDATE_EVENT, handleHistoryUpdate);
-
-    return () => {
-      window.removeEventListener(HISTORY_UPDATE_EVENT, handleHistoryUpdate);
-    };
+    fetchHistory();
   }, []);
 
-  // Update localStorage and dispatch event
-  const updateStorageAndNotify = useCallback((newHistory: HistoryItem[]) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory));
-    window.dispatchEvent(new Event(HISTORY_UPDATE_EVENT));
-  }, []);
-
-  const addToHistory = useCallback((item: HistoryItem) => {
-    setHistory(prev => {
-      const newHistory = [item, ...prev];
-      updateStorageAndNotify(newHistory);
-      return newHistory;
-    });
-  }, [updateStorageAndNotify]);
-
-  const updateHistoryItem = useCallback((id: string, updates: Partial<HistoryItem>) => {
-    setHistory(prev => {
-      const newHistory = prev.map(item =>
-        item.id === id ? { ...item, ...updates } : item
-      );
-      updateStorageAndNotify(newHistory);
-      return newHistory;
-    });
-  }, [updateStorageAndNotify]);
-
-  const removeFromHistory = useCallback((id: string) => {
-    setHistory(prev => {
-      const newHistory = prev.filter(item => item.id !== id);
-      updateStorageAndNotify(newHistory);
-      return newHistory;
-    });
-  }, [updateStorageAndNotify]);
-
-  const clearHistory = useCallback(() => {
-    setHistory([]);
-    updateStorageAndNotify([]);
-  }, [updateStorageAndNotify]);
-
-  const saveReportToDatabase = useCallback(async (item: HistoryItem) => {
+ 
+  const addToHistory = useCallback(async (item: HistoryItem) => {
     try {
-      const response = await fetch('http://127.0.0.1:5000/reports', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(item),
+      const docRef = doc(db, COLLECTION_NAME, item.id);
+      await setDoc(docRef, {
+        fileName: item.fileName,
+        fileSize: item.fileSize,
+        timestamp: item.timestamp.toISOString(),
+        status: item.status,
+        preview: item.preview || null,
+        analysis: item.analysis || null,
+        report: item.report || null, 
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to save report to the database');
-      }
+      setHistory(prev => [item, ...prev]);
     } catch (error) {
-      console.error('Error saving report to the database:', error);
+      console.error('Error adding history item:', error);
     }
   }, []);
 
+  const updateHistoryItem = useCallback(async (id: string, updates: Partial<HistoryItem>) => {
+    try {
+      const docRef = doc(db, COLLECTION_NAME, id);
+      await updateDoc(docRef, updates);
+
+      setHistory(prev => prev.map(item => (item.id === id ? { ...item, ...updates } : item)));
+    } catch (error) {
+      console.error('Error updating history item:', error);
+    }
+  }, []);
+
+  
+  const removeFromHistory = useCallback(async (id: string) => {
+    try {
+      await deleteDoc(doc(db, COLLECTION_NAME, id));
+      setHistory(prev => prev.filter(item => item.id !== id));
+    } catch (error) {
+      console.error('Error deleting history item:', error);
+    }
+  }, []);
+
+  
+  const clearHistory = useCallback(async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, COLLECTION_NAME));
+      querySnapshot.forEach(async docSnap => {
+        await deleteDoc(doc(db, COLLECTION_NAME, docSnap.id));
+      });
+
+      setHistory([]);
+    } catch (error) {
+      console.error('Error clearing history:', error);
+    }
+  }, []);
+
+  // Fetch a specific report from Firestore
   const fetchReportFromDatabase = useCallback(async (id: string) => {
     try {
-      const response = await fetch(`http://127.0.0.1:5000/reports/${id}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch report from the database');
+      const docRef = doc(db, COLLECTION_NAME, id);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        return docSnap.data();
+      } else {
+        console.warn('No such document!');
+        return null;
       }
-      const data = await response.json();
-      return data;
     } catch (error) {
-      console.error('Error fetching report from the database:', error);
+      console.error('Error fetching report from Firestore:', error);
       return null;
+    }
+  }, []);
+
+  // Save the report to Firestore
+  const saveReportToDatabase = useCallback(async (item: HistoryItem) => {
+    try {
+      const docRef = doc(db, COLLECTION_NAME, item.id);
+      await updateDoc(docRef, {
+        report: item.report || null, // Save the report to Firestore
+      });
+
+      // Update the history locally as well
+      setHistory(prev =>
+        prev.map((historyItem) =>
+          historyItem.id === item.id ? { ...historyItem, report: item.report } : historyItem
+        )
+      );
+    } catch (error) {
+      console.error('Error saving report to Firestore:', error);
     }
   }, []);
 
