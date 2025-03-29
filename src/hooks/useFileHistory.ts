@@ -17,7 +17,7 @@ export interface HistoryItem {
   timestamp: Date;
   status: 'analyzed' | 'pending';
   preview?: string;
-  analysis?: object | null;
+  analysis?: string;
   report?: string; 
 }
 
@@ -129,7 +129,7 @@ export function useFileHistory() {
         status: 'analyzed', // Update the status to 'analyzed'\\
         analysis: item.analysis || null, // Save the analysis to Firestore        
       });
-      console.log('Report saved to Firestore:', item);
+      console.log('Report saved to Firestore:', item.report);
 
       // Update the history locally as well
       setHistory(prev =>
