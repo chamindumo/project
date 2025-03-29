@@ -83,11 +83,11 @@ export function AnalyzePage() {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer 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`,
+          Authorization: `Bearer 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`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.0-flash-lite-preview-02-05:free',
+          model: 'deepseek/deepseek-chat-v3-0324:free',
           messages: [
             {
               role: 'user',
@@ -104,8 +104,10 @@ Please generate a detailed and professional report. The report should include:
 5. Potential Risks and Vulnerabilities
 6. Conclusion
 
-Use formal language and ensure the report is easy to understand for both technical and non-technical audiences.`,
+Use formal language and ensure the report is easy to understand for both technical and non-technical audiences. in the paragraphs don't use any bullet points,bolt text or numbering.,'
+              `,
             },
+           
           ],
         }),
       });
@@ -130,7 +132,12 @@ Use formal language and ensure the report is easy to understand for both technic
 
     const reportData = await fetchReportFromDatabase(item.id);
     if (reportData) {
-      setAnalysis(reportData.analysis);
+      const analysisObject = {
+        payload_class:reportData.analysis,
+        iqa_score: reportData.iqaValue, // Add iqaValue to the analysis object
+      };
+      setAnalysis(analysisObject);
+      console.log('Fetched Analysis:', analysisObject);
       setRecommendations(reportData.report);
     } else {
       setAnalysis(item.analysis || null);
@@ -147,6 +154,11 @@ Use formal language and ensure the report is easy to understand for both technic
       }
       const newFile = new File([ab], item.fileName, { type: mimeString });
       setFile(newFile);
+    }
+
+    // Ensure the report is displayed
+    if (item.report) {
+      setRecommendations(item.report);
     }
   }, [fetchReportFromDatabase]);
 
@@ -184,6 +196,7 @@ Use formal language and ensure the report is easy to understand for both technic
 
       const result = await response.json();
       setAnalysis(result);
+      console.log('Analysis Result:', result);
 
       const analysisResults = result.payload_class;
       const iqa = result.iqa_score.toFixed(2);
@@ -198,12 +211,14 @@ Use formal language and ensure the report is easy to understand for both technic
         timestamp: new Date(),
         status: 'analyzed',
         preview,
-        analysis: result,
+        analysis: analysisResults,
         report: recommendations,
+        iqaValue: iqa,
       };
+      console.log('Report Item:', reportItem);
 
       await saveReportToDatabase(reportItem);
-      updateHistoryItem(currentFileId, reportItem);
+      //updateHistoryItem(currentFileId, reportItem);
     } catch (error) {
       console.error('Error during analysis:', error);
       setAnalysis({ error: 'Failed to analyze the file. Please try again.' });
@@ -234,11 +249,11 @@ Use formal language and ensure the report is easy to understand for both technic
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer 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`,
+          Authorization: `Bearer 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`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.0-flash-lite-preview-02-05:free',
+          model: 'deepseek/deepseek-chat-v3-0324:free',
           messages: updatedMessages,
         }),
       });
@@ -367,16 +382,16 @@ Use formal language and ensure the report is easy to understand for both technic
     };
 
     const analysisResults = {
-      payloadClass: analysis.payload_class,
-      iqaScore: parseFloat(analysis.iqa_score).toFixed(2),
-      classProbabilities: analysis.class_probabilities,
+      payloadClass: analysis?.payload_class || "N/A",
+      iqaScore: analysis?.iqa_score ? parseFloat(analysis.iqa_score).toFixed(2) : "N/A",
+      classProbabilities: analysis?.class_probabilities || {},
     };
 
     const filteredImages = [
-      { src: analysis.original_ycbcr, caption: "Original (YCbCr)" },
-      { src: analysis.srm_filtered, caption: "SRM Filtered" },
-      { src: analysis.noise_residual, caption: "Noise Residual" },
-    ];
+      { src: analysis?.original_ycbcr || "", caption: "Original (YCbCr)" },
+      { src: analysis?.srm_filtered || "", caption: "SRM Filtered" },
+      { src: analysis?.noise_residual || "", caption: "Noise Residual" },
+    ].filter(image => image.src); // Filter out images with empty src
 
     const classChartOptions = {
       responsive: true,
@@ -420,7 +435,7 @@ Use formal language and ensure the report is easy to understand for both technic
       return { className, percentage, chartData };
     });
 
-    const iqaPercentage = (parseFloat(analysisResults.iqaScore) * 100).toFixed(2);
+    const iqaPercentage = analysisResults.iqaScore !== "N/A" ? (parseFloat(analysisResults.iqaScore) * 100).toFixed(2) : "0";
     const iqaChartData = {
       labels: ['IQA', 'Remaining'],
       datasets: [
@@ -646,38 +661,25 @@ Use formal language and ensure the report is easy to understand for both technic
 
       let sectionCount = 4;
       const recommendationLines = recommendations.split('\n').filter(line => line.trim() !== '');
+      console.log('Recommendation Lines:', recommendationLines);
       let indentLevel = 1;
       let inPotentialCauses = false;
       let potentialCausesPointNumber = 1;
       let sectionPointNumber = 1;
 
-      recommendationLines.forEach((line) => {
-        const trimmedLine = line.trim();
-
+      const addRecommendationLines = () => {
         checkPageOverflow(20);
+        yPosition = addText("5. Recommendations", margin, yPosition, 14, true, headerColor);
+        yPosition += 5;
+    
+        recommendationLines.forEach((line, index) => {
+          const sanitizedLine = line.replace(/[^\w\s]/g, ''); // Remove all symbols
+          checkPageOverflow(10);
+          yPosition = addText(sanitizedLine, margin, yPosition, 12, false, textColor);
+        });
+      };
 
-        if (trimmedLine.startsWith('##')) {
-          sectionCount++;
-          inPotentialCauses = false;
-          indentLevel = 1;
-          potentialCausesPointNumber = 1;
-          sectionPointNumber = 1;
-          addMainSectionHeading(`${sectionCount}. ${trimmedLine.slice(2).trim()}`);
-        } else if (trimmedLine === 'Potential Causes:') {
-          inPotentialCauses = true;
-          addSubHeading(trimmedLine, 5);
-          indentLevel = 2;
-        } else if (trimmedLine.startsWith('* **')) {
-          const bulletText = trimmedLine.slice(4).trim();
-          addParagraph(bulletText, indentLevel);
-        } else if (trimmedLine.startsWith('-')) {
-          const bulletText = trimmedLine.slice(1).trim();
-          addParagraph(bulletText, indentLevel);
-        } else if (trimmedLine.startsWith('*') && !trimmedLine.startsWith('* **')) {
-          const bulletText = trimmedLine.slice(1).trim();
-          addParagraph(bulletText, indentLevel);
-        }
-      });
+      addRecommendationLines();
 
       const pageCount = doc.getNumberOfPages();
       for (let i = 2; i <= pageCount; i++) {

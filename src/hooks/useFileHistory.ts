@@ -19,6 +19,7 @@ export interface HistoryItem {
   preview?: string;
   analysis?: string;
   report?: string; 
+  iqaValue?: string; // Optional field for IQA value
 }
 
 const COLLECTION_NAME = 'file-analysis-history';
@@ -57,7 +58,9 @@ export function useFileHistory() {
         preview: item.preview || null,
         analysis: item.analysis || null,
         report: item.report || null, 
+        iqaValue: item.iqaValue || null, // Save the IQA value if provided
       });
+      console.log('History item added:', item);
 
       setHistory(prev => [item, ...prev]);
     } catch (error) {
@@ -121,15 +124,20 @@ export function useFileHistory() {
   // Save the report to Firestore
   const saveReportToDatabase = useCallback(async (item: HistoryItem) => {
     try {
+      console.log('Saving report to Firestore:', item);
+      // Check if the item has a report before saving
       const docRef = doc(db, COLLECTION_NAME, item.id);
       await updateDoc(docRef, {
         report: item.report || null, // Save the report to Firestore
+        status: 'analyzed', // Update the status to 'analyzed'
+        analysis: item.analysis || null, // Save the analysis to Firestore
+        iqaValue: item.iqaValue || null, // Save the IQA value to Firestore
       });
 
       // Update the history locally as well
       setHistory(prev =>
         prev.map((historyItem) =>
-          historyItem.id === item.id ? { ...historyItem, report: item.report } : historyItem
+          historyItem.id === item.id ? { ...historyItem, report: item.report,status:'analyzed' } : historyItem
         )
       );
     } catch (error) {
