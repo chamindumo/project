@@ -6,6 +6,7 @@ import { FilePreview } from '../components/FilePreview';
 import { PageHeader } from '../components/PageHeader';
 import { useFileHistory, HistoryItem } from '../hooks/useFileHistory';
 import { useOutletContext } from 'react-router-dom';
+import { RefreshCcw, Download } from "lucide-react";
 import { PDFPreview } from '../components/PDFPreview';
 import jsPDF from 'jspdf';
 import { Doughnut, Pie } from 'react-chartjs-2';
@@ -765,7 +766,7 @@ Use formal language and ensure the report is easy to understand for both technic
             onClick={downloadReport}
             className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors shadow-md"
           >
-            Download Report
+            <Download size={24} strokeWidth={3} />
           </button>
         </div>
       </div>
@@ -899,7 +900,7 @@ Use formal language and ensure the report is easy to understand for both technic
                     onClick={resetAnalysis}
                     className="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors shadow-md mt-4"
                   >
-                    Perform Another Analysis
+                    <RefreshCcw size={24} strokeWidth={3} />
                   </button>
                 </>
               )}
