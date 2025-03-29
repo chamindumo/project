@@ -29,7 +29,7 @@ export function AnalyzePage() {
   const chatBoxRef = useRef<HTMLDivElement>(null);
   const { ref, selectedHistoryItem } = useOutletContext<{ ref: (instance: any) => void; selectedHistoryItem: any }>();
   const location = useLocation();
-
+  
   const resetAnalysis = () => {
     setFile(null);
     setPreview(null);
@@ -38,6 +38,8 @@ export function AnalyzePage() {
     setCurrentFileId(null);
     setError(null);
   };
+
+  
 
   const handleFileDrop = useCallback((droppedFile: File) => {
     setError(null);
@@ -72,6 +74,9 @@ export function AnalyzePage() {
     };
     reader.readAsDataURL(droppedFile);
   }, [addToHistory]);
+
+  
+
 
   const fetchChatCompletion = async (analysisResults: string, iqa: string) => {
     try {
@@ -124,14 +129,12 @@ Use formal language and ensure the report is easy to understand for both technic
     setPreview(item.preview || null);
 
     const reportData = await fetchReportFromDatabase(item.id);
-    if (reportData && reportData.report) {
-      setAnalysis(reportData.analysis || null);
+    if (reportData) {
+      setAnalysis(reportData.analysis);
       setRecommendations(reportData.report);
-      console.log('Fetched report from database:', reportData.report);
     } else {
       setAnalysis(item.analysis || null);
       setRecommendations(item.report || null);
-      console.log('Using item report:', item.report);
     }
 
     if (item.preview) {
@@ -156,9 +159,11 @@ Use formal language and ensure the report is easy to understand for both technic
 
   useEffect(() => {
     if (selectedHistoryItem) {
-      handleHistoryItemSelect(selectedHistoryItem);
+      setFile(new File([], selectedHistoryItem.fileName));
+      setPreview(selectedHistoryItem.preview);
+      setAnalysis(selectedHistoryItem.analysis);
     }
-  }, [selectedHistoryItem, handleHistoryItemSelect]);
+  }, [selectedHistoryItem]);
 
   const handleAnalyze = useCallback(async () => {
     if (!file || !currentFileId || !preview) return;
@@ -289,8 +294,10 @@ Use formal language and ensure the report is easy to understand for both technic
       const trimmedLine = line.trim();
 
       if (trimmedLine.startsWith('**') && trimmedLine.endsWith('**')) {
+        // Handle section headings like **3.2. Stegoimage Algorithm Explanation: JMIPOD**
         sectionCount++;
-        const content = trimmedLine.slice(2, -2).trim();
+        const content = trimmedLine.slice(2, -2).trim(); // Remove ** from start and end
+        // Remove any nested numbering (e.g., "3.2.") and keep only the title
         const title = content.replace(/^\d+\.\d+\.\s*/, '').trim();
         return (
           <div key={i} className="mt-6">
@@ -298,6 +305,7 @@ Use formal language and ensure the report is easy to understand for both technic
           </div>
         );
       } else if (trimmedLine.startsWith('##')) {
+        // Fallback for headings marked with ## (if any)
         sectionCount++;
         const title = trimmedLine.slice(2).replace(/^\d+\.\d+\.\s*/, '').trim();
         return (
@@ -348,28 +356,27 @@ Use formal language and ensure the report is easy to understand for both technic
     });
   };
 
+  
   const renderReport = () => {
-    if (!recommendations && !file && !analysis) {
-      return <p className="text-gray-300">No report available yet. Select a history item or analyze a file.</p>;
-    }
+    if (!file || !analysis || !recommendations) return null;
 
-    const fileDetails = file ? {
+    const fileDetails = {
       fileName: file.name,
       fileSize: `${(file.size / 1024).toFixed(2)} KB`,
       lastModified: new Date(file.lastModified).toLocaleDateString(),
-    } : null;
+    };
 
-    const analysisResults = analysis ? {
+    const analysisResults = {
       payloadClass: analysis.payload_class,
       iqaScore: parseFloat(analysis.iqa_score).toFixed(2),
       classProbabilities: analysis.class_probabilities,
-    } : null;
+    };
 
-    const filteredImages = analysis ? [
+    const filteredImages = [
       { src: analysis.original_ycbcr, caption: "Original (YCbCr)" },
       { src: analysis.srm_filtered, caption: "SRM Filtered" },
       { src: analysis.noise_residual, caption: "Noise Residual" },
-    ] : [];
+    ];
 
     const classChartOptions = {
       responsive: true,
@@ -385,7 +392,7 @@ Use formal language and ensure the report is easy to understand for both technic
             ctx.font = 'bold 24px Helvetica';
             ctx.fillStyle = '#D1D5DB';
             ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
+            ctx.textBaseline= 'middle';
             const text = chart.data.datasets[0].data[0] + '%';
             ctx.fillText(text, width / 2, height / 2);
             ctx.restore();
@@ -396,7 +403,7 @@ Use formal language and ensure the report is easy to understand for both technic
       circumference: 360,
     };
 
-    const classProbabilitiesCharts = analysisResults && Object.entries(analysisResults.classProbabilities).map(([className, prob]) => {
+    const classProbabilitiesCharts = Object.entries(analysisResults.classProbabilities).map(([className, prob]) => {
       const percentage = ((prob as number) * 100).toFixed(2);
       const chartData = {
         labels: [className],
@@ -411,19 +418,20 @@ Use formal language and ensure the report is easy to understand for both technic
         ],
       };
       return { className, percentage, chartData };
-    }) || [];
+    });
 
-    const iqaChartData = analysisResults ? {
+    const iqaPercentage = (parseFloat(analysisResults.iqaScore) * 100).toFixed(2);
+    const iqaChartData = {
       labels: ['IQA', 'Remaining'],
       datasets: [
         {
           label: 'Image Quality Assessment',
-          data: [(parseFloat(analysisResults.iqaScore) * 100).toFixed(2), 100 - parseFloat((parseFloat(analysisResults.iqaScore) * 100).toFixed(2))],
+          data: [iqaPercentage, 100 - parseFloat(iqaPercentage)],
           backgroundColor: ['#36A2EB', '#E5E7EB'],
           hoverBackgroundColor: ['#36A2EB', '#E5E7EB'],
         },
       ],
-    } : null;
+    };
 
     const iqaChartOptions = {
       responsive: true,
@@ -461,28 +469,19 @@ Use formal language and ensure the report is easy to understand for both technic
       };
 
       const addSectionHeading = (heading: string) => {
-        if (yPosition + 20 > pageHeight - margin - 10) {
-          doc.addPage();
-          yPosition = margin + 15;
-        }
+        checkPageOverflow(20);
         yPosition = addText(heading, margin, yPosition, 14, true, headerColor);
         yPosition += 3;
       };
 
       const addMainSectionHeading = (heading: string) => {
-        if (yPosition + 20 > pageHeight - margin - 10) {
-          doc.addPage();
-          yPosition = margin + 15;
-        }
+        checkPageOverflow(20);
         yPosition = addText(heading, margin, yPosition, 16, true, sectionHeaderColor);
         yPosition += 4;
       };
 
       const addSubHeading = (heading: string, indent: number = 0) => {
-        if (yPosition + 15 > pageHeight - margin - 10) {
-          doc.addPage();
-          yPosition = margin + 15;
-        }
+        checkPageOverflow(15);
         yPosition = addText(heading, margin + indent, yPosition, 14, true, subHeaderColor);
         yPosition += 2;
       };
@@ -494,7 +493,7 @@ Use formal language and ensure the report is easy to understand for both technic
         const fontSize = 12;
         doc.setFontSize(fontSize);
 
-        parts.forEach((part) => {
+        parts.forEach((part, index) => {
           const isBoldDouble = part.startsWith('**') && part.endsWith('**');
           const isBoldSingle = part.startsWith('*') && part.endsWith('*') && !isBoldDouble;
           const isBold = isBoldDouble || isBoldSingle;
@@ -510,7 +509,7 @@ Use formal language and ensure the report is easy to understand for both technic
             currentLine += content;
           } else if (currentX === x + indent && testLineWidth > maxLineWidth) {
             const words = content.split(' ');
-            words.forEach((word) => {
+            words.forEach((word, wordIndex) => {
               const testWordLine = currentLine + (currentLine ? ' ' : '') + word;
               const testWordLineWidth = doc.getTextWidth(testWordLine);
 
@@ -518,18 +517,13 @@ Use formal language and ensure the report is easy to understand for both technic
                 currentLine += (currentLine ? ' ' : '') + word;
               } else {
                 if (currentLine) {
-                  if (yPosition + 5 > pageHeight - margin - 10) {
-                    doc.addPage();
-                    yPosition = margin + 15;
-                  }
+                  doc.setFont("helvetica", isBold && wordIndex === 0 ? "bold" : "normal");
+                  checkPageOverflow(5);
                   doc.text(currentLine, currentX, yPosition);
                   yPosition += fontSize * 0.4 * lineSpacing;
                   currentLine = word;
                 } else {
-                  if (yPosition + 5 > pageHeight - margin - 10) {
-                    doc.addPage();
-                    yPosition = margin + 15;
-                  }
+                  checkPageOverflow(5);
                   doc.text(word, currentX, yPosition);
                   yPosition += fontSize * 0.4 * lineSpacing;
                   currentLine = '';
@@ -537,10 +531,7 @@ Use formal language and ensure the report is easy to understand for both technic
               }
             });
           } else {
-            if (yPosition + 5 > pageHeight - margin - 10) {
-              doc.addPage();
-              yPosition = margin + 15;
-            }
+            checkPageOverflow(5);
             doc.text(currentLine, x + indent, yPosition);
             yPosition += fontSize * 0.4 * lineSpacing;
             currentLine = content;
@@ -549,10 +540,7 @@ Use formal language and ensure the report is easy to understand for both technic
         });
 
         if (currentLine) {
-          if (yPosition + 5 > pageHeight - margin - 10) {
-            doc.addPage();
-            yPosition = margin + 15;
-          }
+          checkPageOverflow(5);
           doc.text(currentLine, currentX, yPosition);
           yPosition += fontSize * 0.4 * lineSpacing;
         }
@@ -564,15 +552,39 @@ Use formal language and ensure the report is easy to understand for both technic
 
       const addNumberedPoint = (text: string, pointNumber: number, indentLevel: number = 1) => {
         const indent = indentLevel * 5;
-        if (yPosition + 5 > pageHeight - margin - 10) {
-          doc.addPage();
-          yPosition = margin + 15;
-        }
+        checkPageOverflow(5);
         doc.setFontSize(12);
         doc.setTextColor(textColor);
         const numberText = `${pointNumber}.`;
         doc.text(numberText, margin + indent - 10, yPosition);
         addFormattedText(text, margin, indent);
+      };
+
+      const checkPageOverflow = (additionalHeight: number) => {
+        if (yPosition + additionalHeight > pageHeight - margin - 10) {
+          doc.addPage();
+          yPosition = margin + 15;
+        }
+      };
+
+      const addHeader = () => {
+        doc.setFontSize(10);
+        doc.setTextColor(headerColor);
+        doc.setFont("helvetica", "normal");
+        doc.text("Stegoimage Analysis Report", margin, 10);
+        doc.setDrawColor(headerColor);
+        doc.line(margin, 12, pageWidth - margin, 12);
+      };
+
+      const addFooter = () => {
+        const pageCount = doc.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+          doc.setPage(i);
+          doc.setFontSize(10);
+          doc.setTextColor('#666666');
+          doc.setFont("helvetica", "normal");
+          doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin - 20, pageHeight - 10);
+        }
       };
 
       doc.setFontSize(24);
@@ -584,224 +596,225 @@ Use formal language and ensure the report is easy to understand for both technic
       doc.setFont("helvetica", "normal");
       const currentDate = new Date().toLocaleDateString();
       doc.text(`Date: ${currentDate}`, pageWidth / 2, pageHeight / 3 + 20, { align: 'center' });
-      doc.text(`Subject: Analysis of Stegoimage`, pageWidth / 2, pageHeight / 3 + 30, { align: 'center' });
+      doc.text(`Subject: Analysis of Stegoimage Utilized with ${analysisResults.payloadClass} Algorithm`, pageWidth / 2, pageHeight / 3 + 30, { align: 'center' });
       doc.text(`Generated on: ${new Date().toLocaleString()}`, pageWidth / 2, pageHeight / 3 + 40, { align: 'center' });
       doc.addPage();
 
       yPosition = margin + 15;
 
-      if (fileDetails) {
-        addSectionHeading("1. File Details");
-        addParagraph(`File Name: ${fileDetails.fileName}`);
-        addParagraph(`File Size: ${fileDetails.fileSize}`);
-        addParagraph(`Last Modified: ${fileDetails.lastModified}`);
-        yPosition += 5;
-      }
+      addSectionHeading("1. File Details");
+      addParagraph(`File Name: ${fileDetails.fileName}`);
+      addParagraph(`File Size: ${fileDetails.fileSize}`);
+      addParagraph(`Last Modified: ${fileDetails.lastModified}`);
+      yPosition += 5;
 
-      if (analysisResults) {
-        addSectionHeading("2. Analysis Results");
-        addParagraph(`Payload Classification: ${analysisResults.payloadClass}`);
-        addSubHeading("Class Probabilities:", 5);
-        let pointNumber = 1;
-        Object.entries(analysisResults.classProbabilities).forEach(([className, prob]) => {
-          addNumberedPoint(`${className}: ${((prob as number) * 100).toFixed(2)}%`, pointNumber++, 2);
-        });
-        addParagraph(`IQA Score: ${analysisResults.iqaScore}`);
-        yPosition += 5;
-      }
+      addSectionHeading("2. Analysis Results");
+      addParagraph(`Payload Classification: ${analysisResults.payloadClass}`);
+      addSubHeading("Class Probabilities:", 5);
+      let pointNumber = 1;
+      Object.entries(analysisResults.classProbabilities).forEach(([className, prob]) => {
+        addNumberedPoint(`${className}: ${((prob as number) * 100).toFixed(2)}%`, pointNumber++, 2);
+      });
+      addParagraph(`IQA Score: ${analysisResults.iqaScore}`);
+      yPosition += 5;
 
-      if (filteredImages.length > 0) {
-        addSectionHeading("3. Filtered Images");
-        const imgWidth = 60;
-        const imgHeight = 60;
-        const imgSpacing = 10;
-        const totalWidth = (imgWidth * 3) + (imgSpacing * 2);
-        const startX = (pageWidth - totalWidth) / 2;
+      addSectionHeading("3. Filtered Images");
+      const imgWidth = 60;
+      const imgHeight = 60;
+      const imgSpacing = 10;
+      const totalWidth = (imgWidth * 3) + (imgSpacing * 2);
+      const startX = (pageWidth - totalWidth) / 2;
 
-        filteredImages.forEach((img, index) => {
-          if (yPosition + imgHeight + 20 > pageHeight - margin - 10) {
-            doc.addPage();
-            yPosition = margin + 15;
-          }
-          const xPosition = startX + (index * (imgWidth + imgSpacing));
-          doc.addImage(img.src, 'PNG', xPosition, yPosition, imgWidth, imgHeight);
-          doc.setFontSize(10);
-          doc.setTextColor(textColor);
-          doc.text(img.caption, xPosition + (imgWidth / 2), yPosition + imgHeight + 5, { align: 'center' });
-        });
-        yPosition += imgHeight + 15;
-      }
+      filteredImages.forEach((img, index) => {
+        checkPageOverflow(imgHeight + 20);
+        const xPosition = startX + (index * (imgWidth + imgSpacing));
+        doc.addImage(img.src, 'PNG', xPosition, yPosition, imgWidth, imgHeight);
+        doc.setFontSize(10);
+        doc.setTextColor(textColor);
+        doc.text(img.caption, xPosition + (imgWidth / 2), yPosition + imgHeight + 5, { align: 'center' });
+      });
+      yPosition += imgHeight + 15;
 
       if (preview) {
         addSectionHeading("4. Original Image");
         const imgWidth = 180;
         const imgHeight = 100;
-        if (yPosition + imgHeight + 20 > pageHeight - margin - 10) {
-          doc.addPage();
-          yPosition = margin + 15;
-        }
+        checkPageOverflow(imgHeight + 20);
         doc.addImage(preview, 'JPEG', margin, yPosition, imgWidth, imgHeight);
         yPosition += imgHeight + 10;
       }
 
-      if (recommendations) {
-        let sectionCount = (fileDetails ? 1 : 0) + (analysisResults ? 1 : 0) + (filteredImages.length > 0 ? 1 : 0) + (preview ? 1 : 0);
-        const recommendationLines = recommendations.split('\n').filter(line => line.trim() !== '');
-        let indentLevel = 1;
+      let sectionCount = 4;
+      const recommendationLines = recommendations.split('\n').filter(line => line.trim() !== '');
+      let indentLevel = 1;
+      let inPotentialCauses = false;
+      let potentialCausesPointNumber = 1;
+      let sectionPointNumber = 1;
 
-        recommendationLines.forEach((line) => {
-          const trimmedLine = line.trim();
+      recommendationLines.forEach((line) => {
+        const trimmedLine = line.trim();
 
-          if (yPosition + 20 > pageHeight - margin - 10) {
-            doc.addPage();
-            yPosition = margin + 15;
-          }
+        checkPageOverflow(20);
 
-          if (trimmedLine.startsWith('##')) {
-            sectionCount++;
-            indentLevel = 1;
-            addMainSectionHeading(`${sectionCount}. ${trimmedLine.slice(2).trim()}`);
-          } else if (trimmedLine.startsWith('-') || trimmedLine.startsWith('*')) {
-            const bulletText = trimmedLine.slice(1).trim();
-            addParagraph(bulletText, indentLevel * 5);
-          } else {
-            addParagraph(trimmedLine, indentLevel * 5);
-          }
-        });
-      }
+        if (trimmedLine.startsWith('##')) {
+          sectionCount++;
+          inPotentialCauses = false;
+          indentLevel = 1;
+          potentialCausesPointNumber = 1;
+          sectionPointNumber = 1;
+          addMainSectionHeading(`${sectionCount}. ${trimmedLine.slice(2).trim()}`);
+        } else if (trimmedLine === 'Potential Causes:') {
+          inPotentialCauses = true;
+          addSubHeading(trimmedLine, 5);
+          indentLevel = 2;
+        } else if (trimmedLine.startsWith('* **')) {
+          const bulletText = trimmedLine.slice(4).trim();
+          addParagraph(bulletText, indentLevel);
+        } else if (trimmedLine.startsWith('-')) {
+          const bulletText = trimmedLine.slice(1).trim();
+          addParagraph(bulletText, indentLevel);
+        } else if (trimmedLine.startsWith('*') && !trimmedLine.startsWith('* **')) {
+          const bulletText = trimmedLine.slice(1).trim();
+          addParagraph(bulletText, indentLevel);
+        }
+      });
 
       const pageCount = doc.getNumberOfPages();
       for (let i = 2; i <= pageCount; i++) {
         doc.setPage(i);
-        doc.setFontSize(10);
-        doc.setTextColor(headerColor);
-        doc.setFont("helvetica", "normal");
-        doc.text("Stegoimage Analysis Report", margin, 10);
-        doc.setDrawColor(headerColor);
-        doc.line(margin, 12, pageWidth - margin, 12);
+        addHeader();
       }
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(10);
-        doc.setTextColor('#666666');
-        doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin - 20, pageHeight - 10);
-      }
+      addFooter();
 
-      doc.save(`analysis_report_${file?.name || 'report'}.pdf`);
+      doc.save(`analysis_report_${file.name}_.pdf`);
     };
 
+    
     return (
       <div className="bg-gray-900 shadow-lg rounded-lg p-8 space-y-6 text-white max-w-4xl mx-auto">
-        {fileDetails && (
-          <div className="border-b border-gray-700 pb-4">
-            <h3 className="text-2xl font-bold text-blue-400 mb-3">File Details</h3>
-            <ul className="space-y-2 text-gray-300">
-              <li><span className="font-semibold text-blue-200">File Name:</span> {fileDetails.fileName}</li>
-              <li><span className="font-semibold text-blue-200">File Size:</span> {fileDetails.fileSize}</li>
-              <li><span className="font-semibold text-blue-200">Last Modified:</span> {fileDetails.lastModified}</li>
-            </ul>
-          </div>
-        )}
+        <div className="border-b border-gray-700 pb-4">
+          <h3 className="text-2xl font-bold text-blue-400 mb-3">File Details</h3>
+          <ul className="space-y-2 text-gray-300">
+            <li><span className="font-semibold text-blue-200">File Name:</span> {file.name}</li>
+            <li><span className="font-semibold text-blue-200">File Size:</span> {(file.size / 1024).toFixed(2)} KB</li>
+            <li><span className="font-semibold text-blue-200">Last Modified:</span> {new Date(file.lastModified).toLocaleDateString()}</li>
+          </ul>
+        </div>
 
-        {analysisResults && (
-          <div className="border-b border-gray-700 pb-4">
-            <h3 className="text-2xl font-bold text-blue-400 mb-3">Analysis Results</h3>
-            {analysis.error ? (
-              <p className="text-red-500">{analysis.error}</p>
-            ) : (
-              <div className="space-y-6">
-                <div>
-                  <span className="font-semibold text-blue-200">Payload Classification:</span>{' '}
-                  <span className="text-blue-400">{analysisResults.payloadClass}</span>
-                </div>
-                <div>
-                  <span className="font-semibold text-blue-200">Class Probabilities:</span>
-                  <div className="mt-4 flex flex-wrap justify-center gap-8">
-                    {classProbabilitiesCharts.map((chart, index) => (
-                      <div key={index} className="text-center">
-                        <div className="relative w-32 h-32">
-                          <Doughnut
-                            data={chart.chartData}
-                            options={classChartOptions}
-                            plugins={[classChartOptions.plugins.centerText]}
-                          />
-                        </div>
-                        <p className="mt-2 text-gray-300 text-sm">{chart.className}</p>
+        <div className="border-b border-gray-700 pb-4">
+          <h3 className="text-2xl font-bold text-blue-400 mb-3">Analysis Results</h3>
+          {analysis.error ? (
+            <p className="text-red-500">{analysis.error}</p>
+          ) : (
+            <div className="space-y-6">
+              <div>
+                <span className="font-semibold text-blue-200">Payload Classification:</span>{' '}
+                <span className="text-blue-400">{analysis.payload_class}</span>
+              </div>
+              <div>
+                <span className="font-semibold text-blue-200">Class Probabilities:</span>
+                <div className="mt-4 flex flex-wrap justify-center gap-8">
+                  {classProbabilitiesCharts.map((chart, index) => (
+                    <div key={index} className="text-center">
+                      <div className="relative w-32 h-32">
+                        <Doughnut
+                          data={chart.chartData}
+                          options={classChartOptions}
+                          plugins={[classChartOptions.plugins.centerText]}
+                        />
                       </div>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <span className="font-semibold text-blue-200">Image Quality Assessment (IQA):</span>{' '}
-                  <span className="text-green-400">{analysisResults.iqaScore}</span>
-                  {iqaChartData && (
-                    <div className="mt-4 flex justify-center">
-                      <div className="w-64 h-64">
-                        <Pie data={iqaChartData} options={iqaChartOptions} />
-                      </div>
+                      <p className="mt-2 text-gray-300 text-sm">{chart.className}</p>
                     </div>
-                  )}
+                  ))}
                 </div>
               </div>
-            )}
-          </div>
-        )}
-
-        {filteredImages.length > 0 && (
-          <div className="border-b border-gray-700 pb-4">
-            <h3 className="text-2xl font-bold text-blue-400 mb-4">Filtered Images</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {filteredImages.map((img, index) => (
-                <div key={index} className="text-center">
-                  <img src={img.src} alt={img.caption} className="w-full h-40 object-cover rounded-lg shadow-md" />
-                  <p className="mt-2 text-gray-300 text-sm">{img.caption}</p>
+              <div>
+                <span className="font-semibold text-blue-200">Image Quality Assessment (IQA):</span>{' '}
+                <span className="text-green-400">{analysisResults.iqaScore}</span>
+                <div className="mt-4 flex justify-center">
+                  <div className="w-64 h-64">
+                    <Pie data={iqaChartData} options={iqaChartOptions} />
+                  </div>
                 </div>
-              ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
-        {recommendations && (
-          <div>
-            <h3 className="text-2xl font-bold text-blue-400 mb-4">Detailed Report</h3>
-            <div className="text-gray-300 space-y-2">{formatRecommendations(recommendations)}</div>
+        <div className="border-b border-gray-700 pb-4">
+          <h3 className="text-2xl font-bold text-blue-400 mb-4">Filtered Images</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {filteredImages.map((img, index) => (
+              <div key={index} className="text-center">
+                <img src={img.src} alt={img.caption} className="w-full h-40 object-cover rounded-lg shadow-md" />
+                <p className="mt-2 text-gray-300 text-sm">{img.caption}</p>
+              </div>
+            ))}
           </div>
-        )}
+        </div>
 
-        {(file || analysis || recommendations) && (
-          <div className="flex justify-end">
-            <button
-              onClick={downloadReport}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors shadow-md"
-            >
-              Download Report
-            </button>
-          </div>
-        )}
+        <div>
+          <h3 className="text-2xl font-bold text-blue-400 mb-4">Detailed Analysis</h3>
+          <div className="text-gray-300 space-y-2">{formatRecommendations(recommendations)}</div>
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            onClick={downloadReport}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors shadow-md"
+          >
+            Download Report
+          </button>
+        </div>
       </div>
     );
   };
-
+  
+ 
+  
   return (
     <div>
       <style>
         {`
           @keyframes loading {
-            from { background-position: 100% 0; }
-            to { background-position: -100% 0; }
+            from {
+              background-position: 100% 0;
+            }
+            to {
+              background-position: -100% 0;
+            }
           }
           @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+              opacity: 0;
+              transform: translateY(20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
           }
           @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+              transform: rotate(0deg);
+            }
+            100% {
+              transform: rotate(360deg);
+            }
           }
           @keyframes pulse {
-            0% { transform: scale(1); box-shadow: 0 0 10px rgba(76, 175, 80, 0.5); }
-            50% { transform: scale(1.05); box-shadow: 0 0 20px rgba(76, 175, 80, 0.8); }
-            100% { transform: scale(1); box-shadow: 0 0 10px rgba(76, 175, 80, 0.5); }
+            0% {
+              transform: scale(1);
+              box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+            }
+            50% {
+              transform: scale(1.05);
+              box-shadow: 0 0 20px rgba(76, 175, 80, 0.8);
+            }
+            100% {
+              transform: scale(1);
+              box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+            }
           }
         `}
       </style>
@@ -862,15 +875,13 @@ Use formal language and ensure the report is easy to understand for both technic
         <div>
           <PageHeader title="File Analysis" />
 
-          {!file && !recommendations && !analysis && (
-            <FileDropZone onFileDrop={handleFileDrop} />
-          )}
+          {!file && <FileDropZone onFileDrop={handleFileDrop} />}
 
-          {(file || recommendations || analysis) && (
+          {file && preview && (
             <div className="space-y-8">
-              {file && preview && <FilePreview file={file} preview={preview} />}
+              <FilePreview file={file} preview={preview} />
 
-              {!analysis && file && (
+              {!analysis && (
                 <button
                   onClick={handleAnalyze}
                   className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors shadow-md"
@@ -879,22 +890,30 @@ Use formal language and ensure the report is easy to understand for both technic
                 </button>
               )}
 
-              {renderReport()}
-
-              {(analysis || recommendations) && (
-                <button
-                  onClick={resetAnalysis}
-                  className="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors shadow-md mt-4"
-                >
-                  Perform Another Analysis
-                </button>
+              {analysis && (
+                <>
+                  {renderReport()}
+                  <button
+                    onClick={resetAnalysis}
+                    className="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors shadow-md mt-4"
+                  >
+                    Perform Another Analysis
+                  </button>
+                </>
               )}
             </div>
           )}
         </div>
       )}
 
-      <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 1000 }}>
+      <div
+        style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          zIndex: 1000,
+        }}
+      >
         <button
           onClick={() => setChatOpen(!chatOpen)}
           style={{
@@ -985,6 +1004,10 @@ Use formal language and ensure the report is easy to understand for both technic
                             )
                           )}
                         </span>
+                      ) : line.startsWith('* **') ? (
+                        <span>
+                          <strong>Point:</strong> {line.slice(1).trim()}
+                        </span>
                       ) : (
                         line
                       )}
@@ -994,7 +1017,12 @@ Use formal language and ensure the report is easy to understand for both technic
               </div>
             ))}
             {isChatLoading && (
-              <div style={{ marginBottom: '10px', textAlign: 'left' }}>
+              <div
+                style={{
+                  marginBottom: '10px',
+                  textAlign: 'left',
+                }}
+              >
                 <span
                   style={{
                     display: 'inline-block',

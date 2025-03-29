@@ -107,8 +107,6 @@ export function useFileHistory() {
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
-        console.log('Fetched report:', docSnap.data());
-        // Return the report data
         return docSnap.data();
       } else {
         console.warn('No such document!');
@@ -126,15 +124,12 @@ export function useFileHistory() {
       const docRef = doc(db, COLLECTION_NAME, item.id);
       await updateDoc(docRef, {
         report: item.report || null, // Save the report to Firestore
-        status: 'analyzed', // Update the status to 'analyzed'\\
-        analysis: item.analysis || null, // Save the analysis to Firestore        
       });
-      console.log('Report saved to Firestore:', item.report);
 
       // Update the history locally as well
       setHistory(prev =>
         prev.map((historyItem) =>
-          historyItem.id === item.id ? { ...historyItem, report: item.report, status:'analyzed' } : historyItem
+          historyItem.id === item.id ? { ...historyItem, report: item.report } : historyItem
         )
       );
     } catch (error) {
