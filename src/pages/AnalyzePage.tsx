@@ -86,7 +86,7 @@ export function AnalyzePage() {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer /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`,
+          Authorization: `Bearer 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`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -110,8 +110,7 @@ The stegoimage algorithm detected in the analysis is "${analysisResults}".
 6. Conclusion
 
 Use formal language and ensure the report is easy to understand for both technical and non-technical audiences.
-the report create by Chamindu Moramudali and the data is april 2025`
-,
+the report create by Chamindu Moramudali in the data on april 2025`,
             },
           ],
         }),
@@ -243,10 +242,7 @@ ${iqaRecommendations}
 7. Conclusion
 The image employs the "${analysisResults}" steganographic algorithm with an IQA score of ${iqaPercentage}%. By following the provided IQA-based recommendations, optimizing embedding techniques, and managing data payloads, users can enhance image quality and reduce detection risks. Regular forensic validation is advised to ensure robustness.`;
       const sanitizedReport = report.replace(/[*#]/g, ''); // Remove unwanted symbols
-      return sanitizedReport;
-
-      // Remove all symbols from the report
-      
+      return sanitizedReport;      
      
     }
   };
