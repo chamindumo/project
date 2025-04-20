@@ -130,117 +130,218 @@ the report create by Chamindu Moramudali in the data on april 2025`,
       const iqaPercentage = (parseFloat(iqa) * 100).toFixed(2);
 
       let algorithmExplanation = '';
-switch (analysisResults) {
-  case 'Clean':
-    algorithmExplanation = `- Clean (Class 0):
-      - **Description**: The image contains no embedded steganographic data, preserving its original pixel and statistical integrity. It is free from hidden payloads or modifications that could indicate covert data embedding.
-      - **Technical Details**: No alterations to DCT coefficients (in JPEG images), pixel values, or statistical distributions are detected. The image passes forensic tests like histogram analysis, chi-square tests, and machine learning-based steganalysis with high confidence.
-      - **Use Cases**: Critical for applications requiring authenticity, such as legal evidence, medical imaging (e.g., MRI scans), archival records, and official documentation where tampering is unacceptable.
-      - **Detection Challenges**: Clean images are robust against false positives in steganalysis, as there are no statistical anomalies to misinterpret.
-      - **Implications**: Ensures trust and reliability in sensitive domains but may not serve purposes requiring data embedding (e.g., watermarking or covert communication).`;
-    break;
-
-  case 'JMiPOD':
-    algorithmExplanation = `- JMiPOD (Class 2):
-      - **Description**: JMiPOD (JPEG-Marked Image Preservation of Distribution) is an advanced steganographic algorithm designed to embed data in JPEG images while preserving the natural statistical distribution of DCT coefficients.
-      - **Technical Details**: It modifies DCT coefficients minimally to embed data, using adaptive techniques to match the image’s statistical profile. This reduces detectability by statistical steganalysis tools (e.g., ensemble classifiers or deep learning models).
-      - **Use Cases**: Ideal for watermarking intellectual property (e.g., digital art), covert communications in secure channels, and embedding metadata in media files without compromising visual quality.
-      - **Detection Challenges**: Highly resistant to detection due to its low distortion footprint. Requires sophisticated steganalysis tools, such as feature-based classifiers or neural networks trained on large datasets, to identify embedding.
-      - **Implications**: Offers a balance between data capacity and stealth but may require careful tuning to avoid subtle statistical anomalies under advanced forensic scrutiny.`;
-    break;
-
-  case 'UERD':
-    algorithmExplanation = `- UERD (Class 1):
-      - **Description**: UERD (Uniform Embedding Revisited with Distortion Minimization) is a steganographic method that embeds data uniformly across an image while minimizing visible distortions to maintain perceptual quality.
-      - **Technical Details**: It distributes data bits evenly across pixel values or DCT coefficients, optimizing for minimal mean squared error. The embedding strength can be adjusted, but higher payloads may introduce detectable artifacts.
-      - **Use Cases**: Commonly used for embedding metadata in secure document tagging, digital signatures, or lightweight covert messaging where moderate data capacity is sufficient.
-      - **Detection Challenges**: More detectable than JMiPOD under forensic analysis, as uniform embedding can create subtle statistical deviations (e.g., in pixel correlations or DCT histograms). Machine learning-based steganalysis can exploit these patterns.
-      - **Implications**: Suitable for applications prioritizing image quality over high data capacity. Users should avoid excessive embedding to minimize detection risks.`;
-    break;
-
-  default:
-    algorithmExplanation = `- Unknown Algorithm:
-      - **Description**: The detected algorithm "${analysisResults}" does not match known steganographic methods (Clean, JMiPOD, UERD).
-      - **Technical Details**: The embedding technique may involve custom, experimental, or proprietary methods. It could manipulate pixel values, DCT coefficients, or other image features in non-standard ways.
-      - **Use Cases**: Potentially used in niche applications, proprietary systems, or experimental steganography research. Without further analysis, its purpose remains unclear.
-      - **Detection Challenges**: Requires reverse engineering or advanced forensic tools (e.g., custom feature extraction or deep learning models) to characterize the embedding behavior.
-      - **Implications**: The lack of predefined classification increases the risk of undetected payloads. Further investigation is recommended to assess security and integrity.`;
-}
-
-let qualityInterpretation = '';
-let iqaRecommendations = '';
-const iqaFloat = parseFloat(iqa);
-if (iqaFloat >= 0.90) {
-  qualityInterpretation = 'excellent, with negligible artifacts and high visual fidelity.';
-  iqaRecommendations = `- **Maintain Current Practices**: The high IQA score indicates minimal impact from steganographic embedding, making the image suitable for high-fidelity applications (e.g., professional photography, medical imaging).
-    - **Optimize Embedding**: If using JMiPOD or UERD, continue using low embedding strengths to preserve quality. For Clean images, no embedding is necessary.
-    - **Monitor Compression**: Avoid aggressive lossy compression (e.g., low-quality JPEG) to maintain visual fidelity.
-    - **Regular Validation**: Periodically validate with forensic tools to ensure no unintended embedding occurs.
-    - **Enhance Resolution**: Consider using higher-resolution images to further improve robustness and quality for critical applications.`;
-} else if (iqaFloat >= 0.75) {
-  qualityInterpretation = 'good, with minor artifacts that are barely noticeable.';
-  iqaRecommendations = `- **Refine Embedding Parameters**: Minor artifacts suggest slight distortions from embedding (e.g., with UERD or JMiPOD). Reduce embedding strength or payload size to improve quality.
-    - **Algorithm Selection**: Prefer JMiPOD over UERD for better statistical preservation and lower artifact visibility.
-    - **Preprocessing**: Apply noise reduction or contrast enhancement before embedding to increase image robustness.
-    - **Test Compression**: Ensure lossy compression settings (e.g., JPEG quality) do not exacerbate artifacts.
-    - **User Validation**: Conduct visual inspections or use SSIM/PSNR metrics to confirm acceptability for practical uses (e.g., digital media, watermarking).`;
-} else if (iqaFloat >= 0.50) {
-  qualityInterpretation = 'moderate, with noticeable artifacts that may affect usability.';
-  iqaRecommendations = `- **Reduce Embedding Load**: Noticeable artifacts indicate excessive data embedding or suboptimal algorithm settings. Significantly lower the payload size for UERD or JMiPOD.
-    - **Switch Algorithms**: If using UERD, consider JMiPOD for better quality preservation. If using an unknown algorithm, analyze its embedding behavior to optimize parameters.
-    - **Image Enhancement**: Use high-resolution images or preprocess with sharpening filters to mitigate artifact visibility.
-    - **Forensic Testing**: Perform steganalysis to assess detectability risks, as moderate artifacts may correlate with statistical anomalies.
-    - **Limit Use Cases**: Restrict use to non-critical applications (e.g., casual media sharing) until quality improves.`;
-} else if (iqaFloat >= 0.25) {
-  qualityInterpretation = 'poor, with significant artifacts that degrade visual quality.';
-  iqaRecommendations = `- **Overhaul Embedding Strategy**: Significant artifacts suggest overuse of embedding capacity or an unsuitable algorithm. Drastically reduce payload size or switch to JMiPOD for minimal distortion.
-    - **High-Resolution Source**: Use higher-resolution images to distribute embedding across more pixels, reducing artifact density.
-    - **Algorithm Analysis**: For unknown algorithms, conduct reverse engineering to understand distortion causes. For UERD, lower embedding strength significantly.
-    - **Avoid Lossy Formats**: Minimize use of lossy compression (e.g., JPEG) to prevent further quality degradation.
-    - **Restrict Usage**: Avoid using the image in professional or sensitive contexts (e.g., legal evidence, medical imaging) due to compromised quality.`;
-} else {
-  qualityInterpretation = 'very poor, with severe artifacts rendering the image nearly unusable.';
-  iqaRecommendations = `- **Cease Embedding**: Severe artifacts indicate critical overuse of embedding or an incompatible algorithm. Stop embedding until the process is optimized.
-    - **Reevaluate Algorithm**: If using UERD or an unknown algorithm, switch to JMiPOD or a proven method with lower distortion. Analyze unknown algorithms thoroughly.
-    - **Use New Source Image**: Select a high-resolution, high-quality source image to restart the embedding process.
-    - **Forensic Overhaul**: Conduct comprehensive steganalysis to identify vulnerabilities, as severe artifacts likely make embeddings easily detectable.
-    - **Avoid All Use**: Do not use the image in any application until quality is restored, as it is unsuitable for both visual and steganographic purposes.`;
-}
-
-const report = `1. Introduction
-Steganography involves embedding hidden data within digital media, such as images, in a way that is imperceptible to the human eye. This report analyzes the steganographic properties and quality of the uploaded image, providing insights into the embedding algorithm and its impact on visual fidelity.
-
-2. Stegoimage Algorithm Analysis: "${analysisResults}"
-${algorithmExplanation}
-
-3. Image Quality Assessment (IQA)
-The Image Quality Assessment (IQA) score for the image is ${iqaPercentage}%. This score quantifies the visual quality post-steganographic embedding, based on metrics like structural similarity (SSIM) or peak signal-to-noise ratio (PSNR).
-- Excellent (90% - 100%): Negligible artifacts, ideal for high-fidelity applications.
-- Good (75% - 89%): Minor artifacts, suitable for most practical uses.
-- Moderate (50% - 74%): Noticeable artifacts, acceptable for less critical applications.
-- Poor (25% - 49%): Significant artifacts, limiting usability.
-- Very Poor (Below 25%): Severe artifacts, unsuitable for most purposes.
-
-Interpretation: The image quality is ${qualityInterpretation}
-
-4. IQA-Based Recommendations
-${iqaRecommendations}
-
-5. General Recommendations
-- **Image Selection**: Use high-resolution images to enhance embedding capacity and reduce visible distortions.
-- **Algorithm Optimization**: Select or tune steganographic algorithms (e.g., JMiPOD for stealth, UERD for balance) to minimize statistical and visual artifacts.
-- **Data Payload Management**: Limit embedded data size to preserve image quality and reduce detectability.
-- **Preprocessing**: Apply image enhancement techniques (e.g., noise reduction, contrast adjustment) to improve embedding robustness.
-- **Testing**: Validate images with forensic tools to ensure resistance to steganalysis.
-
-6. Potential Risks and Vulnerabilities
-- **Statistical Attacks**: Steganalysis tools can detect anomalies in pixel distributions or DCT coefficients, especially for UERD or unknown algorithms.
-- **Machine Learning Detection**: Advanced models trained on steganographic patterns can identify embeddings, particularly for non-optimized algorithms.
-- **Compression Artifacts**: Lossy compression (e.g., JPEG) may corrupt embedded data, reducing reliability.
-- **Visual Inspection**: High embedding strengths may produce artifacts visible under close scrutiny, compromising stealth.
-
-7. Conclusion
-The image employs the "${analysisResults}" steganographic algorithm with an IQA score of ${iqaPercentage}%. By following the provided IQA-based recommendations, optimizing embedding techniques, and managing data payloads, users can enhance image quality and reduce detection risks. Regular forensic validation is advised to ensure robustness.`;
+      switch (analysisResults) {
+        case 'Clean':
+          algorithmExplanation = `- Clean (Class 0):
+            - **Description**: The image contains no embedded steganographic data, preserving its original pixel and statistical integrity. It is free from hidden payloads or modifications that could indicate covert data embedding.
+            - **Technical Details**: No alterations to DCT coefficients (in JPEG images), pixel values, or statistical distributions are detected. The image passes forensic tests like histogram analysis, chi-square tests, and machine learning-based steganalysis with high confidence.
+            - **Use Cases**: Critical for applications requiring authenticity, such as legal evidence, medical imaging (e.g., MRI scans), archival records, and official documentation where tampering is unacceptable.
+            - **Detection Challenges**: Clean images are robust against false positives in steganalysis, as there are no statistical anomalies to misinterpret.
+            - **Implications**: Ensures trust and reliability in sensitive domains but may not serve purposes requiring data embedding (e.g., watermarking or covert communication).`;
+          break;
+      
+        case 'JMiPOD':
+          algorithmExplanation = `- JMiPOD (Class 2):
+            - **Description**: JMiPOD (JPEG-Marked Image Preservation of Distribution) is an advanced steganographic algorithm designed to embed data in JPEG images while preserving the natural statistical distribution of DCT coefficients.
+            - **Technical Details**: It modifies DCT coefficients minimally to embed data, using adaptive techniques to match the image’s statistical profile. This reduces detectability by statistical steganalysis tools (e.g., ensemble classifiers or deep learning models).
+            - **Use Cases**: Ideal for watermarking intellectual property (e.g., digital art), covert communications in secure channels, and embedding metadata in media files without compromising visual quality.
+            - **Detection Challenges**: Highly resistant to detection due to its low distortion footprint. Requires sophisticated steganalysis tools, such as feature-based classifiers or neural networks trained on large datasets, to identify embedding.
+            - **Implications**: Offers a balance between data capacity and stealth but may require careful tuning to avoid subtle statistical anomalies under advanced forensic scrutiny.`;
+          break;
+      
+        case 'UERD':
+          algorithmExplanation = `- UERD (Class 1):
+            - **Description**: UERD (Uniform Embedding Revisited with Distortion Minimization) is a steganographic method that embeds data uniformly across an image while minimizing visible distortions to maintain perceptual quality.
+            - **Technical Details**: It distributes data bits evenly across pixel values or DCT coefficients, optimizing for minimal mean squared error. The embedding strength can be adjusted, but higher payloads may introduce detectable artifacts.
+            - **Use Cases**: Commonly used for embedding metadata in secure document tagging, digital signatures, or lightweight covert messaging where moderate data capacity is sufficient.
+            - **Detection Challenges**: More detectable than JMiPOD under forensic analysis, as uniform embedding can create subtle statistical deviations (e.g., in pixel correlations or DCT histograms). Machine learning-based steganalysis can exploit these patterns.
+            - **Implications**: Suitable for applications prioritizing image quality over high data capacity. Users should avoid excessive embedding to minimize detection risks.`;
+          break;
+      
+        default:
+          algorithmExplanation = `- Unknown Algorithm:
+            - **Description**: The detected algorithm "${analysisResults}" does not match known steganographic methods (Clean, JMiPOD, UERD).
+            - **Technical Details**: The embedding technique may involve custom, experimental, or proprietary methods. It could manipulate pixel values, DCT coefficients, or other image features in non-standard ways.
+            - **Use Cases**: Potentially used in niche applications, proprietary systems, or experimental steganography research. Without further analysis, its purpose remains unclear.
+            - **Detection Challenges**: Requires reverse engineering or advanced forensic tools (e.g., custom feature extraction or deep learning models) to characterize the embedding behavior.
+            - **Implications**: The lack of predefined classification increases the risk of undetected payloads. Further investigation is recommended to assess security and integrity.`;
+      }
+      
+      let qualityInterpretation = '';
+      let iqaClassRecommendations = '';
+      const iqaFloat = parseFloat(iqa);
+      
+      if (iqaFloat >= 0.90) {
+        qualityInterpretation = 'excellent, with negligible artifacts and high visual fidelity.';
+        switch (analysisResults) {
+          case 'Clean':
+            iqaClassRecommendations = `- **Maintain Integrity**: The image’s excellent quality and clean status make it ideal for high-fidelity applications (e.g., legal evidence, medical imaging). Continue ensuring no embedding occurs.
+              - **Forensic Validation**: Regularly use steganalysis tools (e.g., chi-square tests, ML classifiers) to confirm the absence of hidden data.
+              - **Avoid Compression**: Use lossless formats (e.g., PNG, TIFF) or high-quality JPEG settings to preserve quality.
+              - **High-Resolution Sources**: Use high-resolution images to maintain robustness in critical applications.`;
+            break;
+          case 'JMiPOD':
+            iqaClassRecommendations = `- **Optimize Stealth Embedding**: JMiPOD’s excellent quality indicates minimal distortion. Maintain low embedding strength to preserve this fidelity for applications like watermarking or covert communication.
+              - **Statistical Tuning**: Fine-tune DCT coefficient adjustments to further reduce detectability by advanced steganalysis.
+              - **Compression Care**: Use high-quality JPEG settings to avoid disrupting embedded data.
+              - **Validate Output**: Test with SSIM/PSNR metrics to ensure consistent high quality.`;
+            break;
+          case 'UERD':
+            iqaClassRecommendations = `- **Refine Embedding**: UERD’s excellent quality suggests well-optimized embedding. Maintain minimal payload sizes to keep artifacts negligible for metadata tagging or lightweight messaging.
+              - **Switch to JMiPOD**: Consider JMiPOD for even lower detectability in high-fidelity contexts.
+              - **Preprocessing**: Enhance image contrast or resolution before embedding to sustain quality.
+              - **Forensic Checks**: Monitor for statistical anomalies using steganalysis to ensure robustness.`;
+            break;
+          default:
+            iqaClassRecommendations = `- **Analyze Unknown Algorithm**: The excellent quality suggests minimal distortion, but the unknown algorithm requires analysis to understand its embedding behavior.
+              - **Reverse Engineering**: Use forensic tools to characterize the algorithm and assess its stealth.
+              - **Maintain Quality**: Continue using high-resolution images and minimal embedding to preserve fidelity.
+              - **Validate Security**: Perform steganalysis to ensure the algorithm isn’t introducing vulnerabilities.`;
+        }
+      } else if (iqaFloat >= 0.75) {
+        qualityInterpretation = 'good, with minor artifacts that are barely noticeable.';
+        switch (analysisResults) {
+          case 'Clean':
+            iqaClassRecommendations = `- **Ensure No Embedding**: The good quality suggests possible minor degradation (e.g., from compression). Confirm the image remains clean with forensic tools.
+              - **Lossless Formats**: Use PNG or TIFF to avoid compression artifacts.
+              - **Image Enhancement**: Apply preprocessing (e.g., noise reduction) to restore excellent quality.
+              - **Use Case Check**: Ensure suitability for sensitive applications despite minor quality loss.`;
+            break;
+          case 'JMiPOD':
+            iqaClassRecommendations = `- **Reduce Embedding Strength**: Minor artifacts indicate slight JMiPOD distortion. Lower payload size to achieve excellent quality for watermarking or covert communication.
+              - **Statistical Optimization**: Adjust DCT modifications to better match the image’s statistical profile.
+              - **Preprocessing**: Use noise reduction or sharpening to minimize artifact visibility.
+              - **Test Compression**: Ensure JPEG settings preserve embedded data and visual quality.`;
+            break;
+          case 'UERD':
+            iqaClassRecommendations = `- **Optimize UERD Parameters**: Minor artifacts suggest UERD embedding is slightly overdone. Reduce embedding strength for metadata tagging or messaging.
+              - **Consider JMiPOD**: Switch to JMiPOD for better quality preservation and lower detectability.
+              - **Image Enhancement**: Use high-resolution images to reduce artifact impact.
+              - **Forensic Validation**: Check for statistical deviations to minimize detection risks.`;
+            break;
+          default:
+            iqaClassRecommendations = `- **Investigate Unknown Algorithm**: Minor artifacts with an unknown algorithm suggest unoptimized embedding. Analyze the algorithm to identify distortion causes.
+              - **Lower Payload**: Reduce embedding size to minimize artifacts.
+              - **High-Resolution Images**: Use better source images to improve quality.
+              - **Steganalysis**: Perform forensic analysis to assess the algorithm’s security and impact.`;
+        }
+      } else if (iqaFloat >= 0.50) {
+        qualityInterpretation = 'moderate, with noticeable artifacts that may affect usability.';
+        switch (analysisResults) {
+          case 'Clean':
+            iqaClassRecommendations = `- **Address Quality Degradation**: Noticeable artifacts in a clean image suggest significant external degradation (e.g., heavy compression). Avoid using this image in critical applications.
+              - **Restore Quality**: Use a higher-quality source image or apply restoration techniques (e.g., denoising).
+              - **Lossless Storage**: Switch to lossless formats to prevent further degradation.
+              - **Validate Integrity**: Confirm no unintended embedding with steganalysis tools.`;
+            break;
+          case 'JMiPOD':
+            iqaClassRecommendations = `- **Reduce JMiPOD Payload**: Noticeable artifacts indicate excessive embedding. Significantly lower payload size to improve quality for watermarking or covert channels.
+              - **Optimize Algorithm**: Fine-tune DCT coefficient adjustments to reduce statistical and visual artifacts.
+              - **High-Resolution Source**: Use higher-resolution images to distribute embedding more effectively.
+              - **Limit Use Cases**: Restrict to non-critical applications until quality improves.`;
+            break;
+          case 'UERD':
+            iqaClassRecommendations = `- **Overhaul UERD Embedding**: Noticeable artifacts suggest UERD is overused. Drastically reduce payload or switch to JMiPOD for better quality.
+              - **Image Enhancement**: Use high-resolution images or preprocessing to mitigate artifacts.
+              - **Forensic Testing**: Check for statistical anomalies, as artifacts may increase detectability.
+              - **Non-Critical Use**: Limit to casual applications (e.g., media sharing) until optimized.`;
+            break;
+          default:
+            iqaClassRecommendations = `- **Analyze Unknown Algorithm**: Noticeable artifacts with an unknown algorithm indicate poor embedding optimization. Perform reverse engineering to understand distortion causes.
+              - **Reduce Embedding**: Lower payload size to minimize artifacts.
+              - **High-Quality Source**: Use high-resolution images to improve embedding capacity.
+              - **Restrict Usage**: Avoid sensitive applications until the algorithm is characterized and optimized.`;
+        }
+      } else if (iqaFloat >= 0.25) {
+        qualityInterpretation = 'poor, with significant artifacts that degrade visual quality.';
+        switch (analysisResults) {
+          case 'Clean':
+            iqaClassRecommendations = `- **Replace Image**: Significant artifacts in a clean image indicate severe degradation (e.g., from compression or processing). Replace with a high-quality source image.
+              - **Lossless Formats**: Use PNG or TIFF to prevent further quality loss.
+              - **Validate Integrity**: Confirm no hidden data with forensic tools, as artifacts may mimic embedding.
+              - **Avoid Use**: Do not use in professional or sensitive contexts due to compromised quality.`;
+            break;
+          case 'JMiPOD':
+            iqaClassRecommendations = `- **Minimize JMiPOD Embedding**: Significant artifacts suggest excessive payload or poor optimization. Drastically reduce embedding size to restore quality.
+              - **Algorithm Tuning**: Optimize DCT modifications to minimize visual and statistical impact.
+              - **High-Resolution Images**: Use better source images to reduce artifact density.
+              - **Restrict Use**: Avoid professional applications (e.g., watermarking) until quality improves.`;
+            break;
+          case 'UERD':
+            iqaClassRecommendations = `- **Switch from UERD**: Significant artifacts indicate UERD is unsuitable. Switch to JMiPOD or halt embedding until optimized.
+              - **Lower Payload**: Reduce embedding strength to minimize distortions.
+              - **Image Enhancement**: Use high-resolution images to improve embedding capacity.
+              - **Avoid Sensitive Use**: Do not use in critical applications due to high detectability and poor quality.`;
+            break;
+          default:
+            iqaClassRecommendations = `- **Characterize Unknown Algorithm**: Significant artifacts suggest an unoptimized or flawed algorithm. Conduct forensic analysis to understand its behavior.
+              - **Halt Embedding**: Stop embedding until the algorithm is optimized.
+              - **New Source Image**: Use a high-quality, high-resolution image to restart the process.
+              - **Avoid Use**: Do not use in any application until quality and security are improved.`;
+        }
+      } else {
+        qualityInterpretation = 'very poor, with severe artifacts rendering the image nearly unusable.';
+        switch (analysisResults) {
+          case 'Clean':
+            iqaClassRecommendations = `- **Replace Image Immediately**: Severe artifacts in a clean image indicate critical degradation (e.g., from extreme compression). Use a new, high-quality source image.
+              - **Lossless Storage**: Store in PNG or TIFF to prevent further quality loss.
+              - **Forensic Check**: Confirm no unintended embedding, as artifacts may resemble steganographic patterns.
+              - **Do Not Use**: Unsuitable for any application due to severe quality issues.`;
+            break;
+          case 'JMiPOD':
+            iqaClassRecommendations = `- **Cease JMiPOD Embedding**: Severe artifacts indicate critical overuse of JMiPOD. Stop embedding and reassess the process.
+              - **Algorithm Review**: Analyze DCT modification strategy to identify distortion causes.
+              - **New Source Image**: Use a high-resolution, high-quality image to restart embedding.
+              - **Avoid Use**: Unsuitable for any application, including watermarking, until quality is restored.`;
+            break;
+          case 'UERD':
+            iqaClassRecommendations = `- **Abandon UERD Embedding**: Severe artifacts confirm UERD is inappropriate. Switch to JMiPOD or stop embedding entirely.
+              - **New Image**: Start with a high-quality, high-resolution source image.
+              - **Forensic Analysis**: Check for detectability, as severe artifacts likely make embeddings obvious.
+              - **Do Not Use**: Unsuitable for any purpose due to compromised quality and security.`;
+            break;
+          default:
+            iqaClassRecommendations = `- **Halt Unknown Algorithm**: Severe artifacts indicate a flawed or unoptimized algorithm. Cease embedding and perform reverse engineering to understand its behavior.
+              - **New Source Image**: Use a high-quality image to restart the process.
+              - **Comprehensive Analysis**: Conduct forensic tests to assess security vulnerabilities.
+              - **Do Not Use**: Completely unsuitable until the algorithm is optimized and quality is restored.`;
+        }
+      }
+      
+      const report = `1. Introduction
+      Steganography involves embedding hidden data within digital media, such as images, in a way that is imperceptible to the human eye. This report analyzes the steganographic properties and quality of the uploaded image, providing insights into the embedding algorithm and its impact on visual fidelity.
+      
+      2. Stegoimage Algorithm Analysis: "${analysisResults}"
+      ${algorithmExplanation}
+      
+      3. Image Quality Assessment (IQA)
+      The Image Quality Assessment (IQA) score for the image is ${iqaPercentage}%. This score quantifies the visual quality post-steganographic embedding, based on metrics like structural similarity (SSIM) or peak signal-to-noise ratio (PSNR).
+      - Excellent (90% - 100%): Negligible artifacts, ideal for high-fidelity applications.
+      - Good (75% - 89%): Minor artifacts, suitable for most practical uses.
+      - Moderate (50% - 74%): Noticeable artifacts, acceptable for less critical applications.
+      - Poor (25% - 49%): Significant artifacts, limiting usability.
+      - Very Poor (Below 25%): Severe artifacts, unsuitable for most purposes.
+      
+      Interpretation: The image quality is ${qualityInterpretation}
+      
+      4. Recommendations Based on IQA and Class Type
+      ${iqaClassRecommendations}
+      
+      5. General Recommendations
+      - **Image Selection**: Use high-resolution images to enhance embedding capacity and reduce visible distortions.
+      - **Algorithm Optimization**: Select or tune steganographic algorithms (e.g., JMiPOD for stealth, UERD for balance) to minimize statistical and visual artifacts.
+      - **Data Payload Management**: Limit embedded data size to preserve image quality and reduce detectability.
+      - **Preprocessing**: Apply image enhancement techniques (e.g., noise reduction, contrast adjustment) to improve embedding robustness.
+      - **Testing**: Validate images with forensic tools to ensure resistance to steganalysis.
+      
+      6. Potential Risks and Vulnerabilities
+      - **Statistical Attacks**: Steganalysis tools can detect anomalies in pixel distributions or DCT coefficients, especially for UERD or unknown algorithms.
+      - **Machine Learning Detection**: Advanced models trained on steganographic patterns can identify embeddings, particularly for non-optimized algorithms.
+      - **Compression Artifacts**: Lossy compression (e.g., JPEG) may corrupt embedded data, reducing reliability.
+      - **Visual Inspection**: High embedding strengths may produce artifacts visible under close scrutiny, compromising stealth.
+      
+      7. Conclusion
+      The image employs the "${analysisResults}" steganographic algorithm with an IQA score of ${iqaPercentage}%. By following the provided recommendations tailored to the IQA level and algorithm type, users can enhance image quality, optimize embedding, and reduce detection risks. Regular forensic validation is advised to ensure robustness.`;
       const sanitizedReport = report.replace(/[*#]/g, ''); // Remove unwanted symbols
       return sanitizedReport;      
      
