@@ -86,7 +86,7 @@ export function AnalyzePage() {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer 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`,
+          Authorization: `Bearer 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`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -470,7 +470,7 @@ the report create by Chamindu Moramudali in the data on april 2025`,
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer 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`,
+          Authorization: `Bearer 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`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
