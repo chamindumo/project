@@ -86,7 +86,7 @@ export function AnalyzePage() {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer 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`,
+          Authorization: `Bearer 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`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
